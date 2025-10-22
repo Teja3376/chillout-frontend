@@ -5,6 +5,9 @@ import "@/styles/globals.css";
 export const metadata = {
   title: "Chillout App",
   description: "Hang out with friends",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({
