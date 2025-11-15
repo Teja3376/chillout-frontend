@@ -56,8 +56,8 @@ export const useSocket = () => {
   if (!context) throw new Error("useSocket must be used within SocketProvider");
   return context;
 };
-
-export const useOnlineUsers = (p0: string) => {
+export const useOnlineUsers = ({roomId }: {roomId?:string | undefined}) => {
+  console.log(roomId);
   const context = useContext(OnlineUsersContext);
   return context;
 };

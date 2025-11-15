@@ -18,7 +18,7 @@ export default function RoomPage() {
   const searchParams = useSearchParams();
   const username = searchParams.get("username") || "anonymous";
   const socket = useSocket();
-  const onlineUsers = useOnlineUsers(roomId as string);
+  const onlineUsers = useOnlineUsers({ roomId: roomId as string });
   const { data: roomData } = useGetRoom(roomId as string);
 
   const [messages, setMessages] = useState<
@@ -227,7 +227,6 @@ export default function RoomPage() {
     }
 
     if (audioRef.current) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       audioRef.current.pause();
       try {
         audioRef.current.src = "";
