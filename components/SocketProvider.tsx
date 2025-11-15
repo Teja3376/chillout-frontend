@@ -57,7 +57,7 @@ export const useSocket = () => {
   return context;
 };
 
-export const useOnlineUsers = () => {
+export const useOnlineUsers = (p0: string) => {
   const context = useContext(OnlineUsersContext);
   return context;
 };
