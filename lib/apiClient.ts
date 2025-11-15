@@ -16,9 +16,9 @@ const getAuthToken = () => {
 
 // Create an Axios instance
 const api = axios.create({
-  // baseURL: "http://localhost:5000/api", 
+  // baseURL: "http://localhost:5000/api",
   baseURL: "https://chillout-backend-v2.onrender.com/api",
-   headers: {
+  headers: {
     "Content-Type": "application/json",
   },
   timeout: 120000, // 2 minutes timeout
@@ -62,6 +62,7 @@ interface Message {
   message: string;
   type: string;
   createdAt: string;
+  url?: string;
 }
 
 /**
@@ -84,4 +85,22 @@ export const roomApi = {
    */
   getRoom: (roomId: string) =>
     api.get<Room>(`/room/${roomId}`).then((res) => res.data),
+
+  /**
+   * Uploads a voice file for a room.
+   * @param roomId - ID of the room.
+   * @param username - Username of the sender.
+   * @param voiceFile - The voice file blob.
+   * @returns Promise resolving to the upload response.
+   */
+  uploadVoice: (roomId: string, username: string, voiceFile: Blob) => {
+    const formData = new FormData();
+    formData.append("voice", voiceFile);
+    formData.append("username", username);
+    return api
+      .post(`/room/${roomId}/voice`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((res) => res.data);
+  },
 };
