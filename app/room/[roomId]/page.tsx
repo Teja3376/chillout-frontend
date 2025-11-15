@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useParams } from "next/navigation";
-import { useSocket, useOnlineUsers } from "@/components/SocketProvider";
+import { useSocket, useOnlineUsers, SOCKET_URL } from "@/components/SocketProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGetRoom } from "@/lib/hooks";
@@ -56,7 +56,7 @@ export default function RoomPage() {
           url: msg.url
             ? msg.url.startsWith("http")
               ? msg.url
-              : `http://localhost:5000${msg.url}`
+              : `${SOCKET_URL}${msg.url}`
             : undefined,
         }))
       );
@@ -92,7 +92,7 @@ export default function RoomPage() {
           ...data,
           url: data.url.startsWith("http")
             ? data.url
-            : `http://localhost:5000${data.url}`,
+            : `${SOCKET_URL}${data.url}`,
         },
       ]);
       // Simple CSS animation for new message
@@ -188,7 +188,7 @@ export default function RoomPage() {
       socket.emit("send_voice_message", {
         roomId,
         username,
-        url: `http://localhost:5000${response.url}`,
+        url: `${SOCKET_URL}${response.url}`,
       });
     } catch (error) {
       console.error("Error sending voice message:", error);
