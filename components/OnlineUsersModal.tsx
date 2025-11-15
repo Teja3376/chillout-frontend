@@ -11,7 +11,7 @@ export default function OnlineUsersModal({
   isOpen,
   onClose,
 }: OnlineUsersModalProps) {
-  const onlineUsers = useOnlineUsers();
+  const onlineUsers = useOnlineUsers({});
 
   if (!isOpen) return null;
 
