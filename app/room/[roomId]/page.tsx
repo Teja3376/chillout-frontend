@@ -5,10 +5,17 @@ import { useSocket, useOnlineUsers } from "@/components/SocketProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useGetRoom } from "@/lib/hooks";
+import { roomApi } from "@/lib/apiClient";
 // import SplitText from "@/components/SplitText";
 import OnlineUsersModal from "@/components/OnlineUsersModal";
 import Image from "next/image";
-import { UsersIcon } from "lucide-react";
+import {
+  UsersIcon,
+  MicIcon,
+  MicOffIcon,
+  PlayIcon,
+  PauseIcon,
+} from "lucide-react";
 // import * as anime from "animejs";
 
 export default function RoomPage() {
@@ -21,16 +28,38 @@ export default function RoomPage() {
   const { data: roomData } = useGetRoom(roomId as string);
 
   const [messages, setMessages] = useState<
-    { username: string; message: string }[]
+    { username: string; message: string; type?: string; url?: string }[]
   >([]);
   const [newMessage, setNewMessage] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
+    null
+  );
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [playingAudio, setPlayingAudio] = useState<{
+    index: number | null;
+    isPlaying: boolean;
+    currentTime: number;
+    duration: number;
+  }>({ index: null, isPlaying: false, currentTime: 0, duration: 0 });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     if (roomData) {
-      setMessages(roomData.messages);
+      setMessages(
+        roomData.messages.map((msg) => ({
+          ...msg,
+          url: msg.url
+            ? msg.url.startsWith("http")
+              ? msg.url
+              : `http://localhost:5000${msg.url}`
+            : undefined,
+        }))
+      );
     }
   }, [roomData]);
 
@@ -56,8 +85,36 @@ export default function RoomPage() {
       }, 100);
     });
 
+    socket.on("receive_voice_message", (data) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          ...data,
+          url: data.url.startsWith("http")
+            ? data.url
+            : `http://localhost:5000${data.url}`,
+        },
+      ]);
+      // Simple CSS animation for new message
+      setTimeout(() => {
+        const lastMessage = document.querySelector(
+          ".message-bubble:last-child"
+        ) as HTMLElement;
+        if (lastMessage) {
+          lastMessage.style.transform = "scale(0.8)";
+          lastMessage.style.opacity = "0";
+          setTimeout(() => {
+            lastMessage.style.transition = "all 0.5s ease-out";
+            lastMessage.style.transform = "scale(1)";
+            lastMessage.style.opacity = "1";
+          }, 50);
+        }
+      }, 100);
+    });
+
     return () => {
       socket.off("receive_message");
+      socket.off("receive_voice_message");
     };
   }, [socket, roomId, username]);
 
@@ -70,6 +127,113 @@ export default function RoomPage() {
     if (newMessage.trim() === "") return;
     socket.emit("send_message", { roomId, username, message: newMessage });
     setNewMessage("");
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+
+      const chunks: Blob[] = [];
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        setRecordedBlob(blob);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      recorder.start();
+    } catch (error) {
+      console.error("Error starting recording:", error);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+      setMediaRecorder(null);
+    }
+  };
+
+  const previewVoiceMessage = () => {
+    if (recordedBlob) {
+      const audioUrl = URL.createObjectURL(recordedBlob);
+      const audio = new Audio(audioUrl);
+      setIsPreviewing(true);
+      audio.onended = () => {
+        setIsPreviewing(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+      audio.play();
+    }
+  };
+
+  const sendRecordedVoiceMessage = async () => {
+    if (recordedBlob) {
+      await sendVoiceMessage(recordedBlob);
+      setRecordedBlob(null);
+    }
+  };
+
+  const sendVoiceMessage = async (voiceBlob: Blob) => {
+    try {
+      const response = await roomApi.uploadVoice(
+        roomId as string,
+        username,
+        voiceBlob
+      );
+      socket.emit("send_voice_message", {
+        roomId,
+        username,
+        url: `http://localhost:5000${response.url}`,
+      });
+    } catch (error) {
+      console.error("Error sending voice message:", error);
+    }
+  };
+
+  const playVoiceMessage = (index: number, url: string) => {
+    if (playingAudio.index === index && playingAudio.isPlaying) {
+      // Pause
+      if (audioRef.current) {
+        audioRef.current.pause();
+        setPlayingAudio((prev) => ({ ...prev, isPlaying: false }));
+      }
+    } else {
+      // Play new or resume
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onloadedmetadata = () => {
+        setPlayingAudio({
+          index,
+          isPlaying: true,
+          currentTime: 0,
+          duration: audio.duration,
+        });
+      };
+      audio.ontimeupdate = () => {
+        setPlayingAudio((prev) =>
+          prev.index === index
+            ? { ...prev, currentTime: audio.currentTime }
+            : prev
+        );
+      };
+      audio.onended = () => {
+        setPlayingAudio({
+          index: null,
+          isPlaying: false,
+          currentTime: 0,
+          duration: 0,
+        });
+      };
+      audio.play();
+    }
   };
 
   return (
@@ -172,7 +336,35 @@ export default function RoomPage() {
                 ></span> */}
                 {msg.username === username ? "You" : msg.username}
               </p>
-              <p className="break-words text-lg">{msg.message}</p>
+              {msg.type === "voice" && msg.url ? (
+                <div className="flex flex-col items-start space-y-2">
+                  <Button
+                    onClick={() => playVoiceMessage(idx, msg.url!)}
+                    className="bg-gray-700 hover:bg-gray-600 text-white rounded-full p-2"
+                  >
+                    {playingAudio.index === idx && playingAudio.isPlaying ? (
+                      <PauseIcon className="w-5 h-5" />
+                    ) : (
+                      <PlayIcon className="w-5 h-5" />
+                    )}
+                  </Button>
+                  {playingAudio.index === idx && (
+                    <div className="w-full bg-gray-600 rounded-full h-2">
+                      <div
+                        className="bg-neon-blue h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${
+                            (playingAudio.currentTime / playingAudio.duration) *
+                            100
+                          }%`,
+                        }}
+                      ></div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="break-words text-lg">{msg.message}</p>
+              )}
             </div>
           </div>
         ))}
@@ -189,12 +381,44 @@ export default function RoomPage() {
           onKeyDown={(e) => e.key === "Enter" && sendMessage()}
           className="flex-1 rounded-2xl bg-gray-800/50 border-neon-blue/30 text-white placeholder:text-gray-400 focus-visible:ring-neon-blue backdrop-blur-sm hover:border-neon-blue/50 transition-all duration-300 text-base sm:text-lg py-2 sm:py-3"
         />
+        {recordedBlob && (
+          <Button
+            onClick={previewVoiceMessage}
+            disabled={isPreviewing}
+            className="rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold shadow-2xl transition-all duration-300 hover:scale-110 px-4 sm:px-6 py-2 sm:py-3 text-base sm:text-lg"
+          >
+            {isPreviewing ? "Playing..." : "Preview"}
+          </Button>
+        )}
         <Button
-          onClick={sendMessage}
-          className="rounded-2xl bg-gradient-to-r from-neon-blue to-neon-purple hover:from-neon-blue/80 hover:to-neon-purple/80 text-white font-bold shadow-2xl transition-all duration-300 hover:scale-110 hover:shadow-neon-blue/50 animate-glow px-4 sm:px-6 py-2 sm:py-3 text-base sm:text-lg"
+          onClick={isRecording ? stopRecording : startRecording}
+          className={`rounded-2xl font-bold shadow-2xl transition-all duration-300 hover:scale-110 px-4 sm:px-6 py-2 sm:py-3 text-base sm:text-lg ${
+            isRecording
+              ? "bg-red-600 hover:bg-red-700 text-white animate-pulse"
+              : "bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white"
+          }`}
         >
-          Send
+          {isRecording ? (
+            <MicOffIcon className="w-5 h-5" />
+          ) : (
+            <MicIcon className="w-5 h-5" />
+          )}
         </Button>
+        {recordedBlob ? (
+          <Button
+            onClick={sendRecordedVoiceMessage}
+            className="rounded-2xl bg-gradient-to-r from-neon-blue to-neon-purple hover:from-neon-blue/80 hover:to-neon-purple/80 text-white font-bold shadow-2xl transition-all duration-300 hover:scale-110 hover:shadow-neon-blue/50 animate-glow px-4 sm:px-6 py-2 sm:py-3 text-base sm:text-lg"
+          >
+            Send Voice
+          </Button>
+        ) : (
+          <Button
+            onClick={sendMessage}
+            className="rounded-2xl bg-gradient-to-r from-neon-blue to-neon-purple hover:from-neon-blue/80 hover:to-neon-purple/80 text-white font-bold shadow-2xl transition-all duration-300 hover:scale-110 hover:shadow-neon-blue/50 animate-glow px-4 sm:px-6 py-2 sm:py-3 text-base sm:text-lg"
+          >
+            Send
+          </Button>
+        )}
       </footer>
 
       <OnlineUsersModal

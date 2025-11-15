@@ -10,6 +10,7 @@ interface Room {
     message: string;
     type: string;
     createdAt: string;
+    url?: string;
   }[];
 }
 
