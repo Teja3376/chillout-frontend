@@ -7,7 +7,7 @@ export const metadata = {
   title: "Chillout App",
   description: "Hang out with friends",
   icons: {
-    icon: "/logo.png",
+    icon: "/chillout-title.png",
   },
 };
 

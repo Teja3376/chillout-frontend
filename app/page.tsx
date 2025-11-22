@@ -14,6 +14,8 @@ import {
 import Image from "next/image";
 import { Loader2 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme } from "next-themes";
+import { roomApi } from "@/lib/apiClient";
 
 const FlowingDots = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -114,6 +116,18 @@ export default function HomePage() {
   const [username, setUsername] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  // Wait for theme to be mounted to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+    
+    // Call health check to wake up backend
+    roomApi.healthCheck()
+      .then((data) => console.log("Backend health check:", data))
+      .catch((err) => console.error("Backend health check failed:", err));
+  }, []);
 
   const handleJoin = async () => {
     if (!roomId.trim()) return;
@@ -125,6 +139,9 @@ export default function HomePage() {
     }, 1500);
   };
 
+  // Determine which logo to show based on theme
+  const logoSrc = !mounted ? "/Chillout-dark.png" : theme === "light" ? "/Chillout-light.png" : "/Chillout-dark.png";
+
   return (
     <div className="w-full h-full flex items-center justify-center min-h-screen bg-background p-4 sm:p-6 relative overflow-hidden selection:bg-primary/20">
       {/* Background Effects */}
@@ -135,15 +152,12 @@ export default function HomePage() {
         <ThemeToggle />
       </div>
 
-      <Card className="w-full max-w-md mx-auto bg-card/30 backdrop-blur-xl border-white/10 shadow-2xl rounded-3xl relative z-10 animate-float-slow overflow-hidden ring-1 ring-white/5">
+      <Card className="w-full max-w-md mx-auto bg-card/30 backdrop-blur-xl border-white/10 shadow-2xl rounded-3xl relative z-10 sm:animate-float-slow overflow-hidden ring-1 ring-white/5">
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none"></div>
         
         <CardHeader className="text-center relative z-10 pt-10">
-          <div className="mx-auto mb-6 relative w-24 h-24 flex items-center justify-center">
-             <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse-glow"></div>
-             <div className="relative z-10 bg-background/50 p-4 rounded-2xl border border-white/10 backdrop-blur-md shadow-inner flex items-center justify-center">
-                <span className="text-4xl">🌌</span>
-             </div>
+          <div className="mx-auto mb-6 relative w-32 h-32 flex items-center justify-center">
+             <Image src={logoSrc} alt="Chillout" width={120} height={120} className="drop-shadow-2xl rounded-md" />
           </div>
           <CardTitle className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary via-indigo-400 to-primary">
             Chillout
@@ -160,7 +174,7 @@ export default function HomePage() {
               placeholder="Enter your username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="bg-white/5 border-white/10 text-foreground placeholder:text-muted-foreground/50 focus-visible:ring-primary/50 focus-visible:border-primary/50 h-12 rounded-xl transition-all duration-300 hover:bg-white/10"
+              className="bg-background/80 border-border text-foreground placeholder:text-muted-foreground/50 focus-visible:ring-primary/50 focus-visible:border-primary/50 h-12 rounded-xl transition-all duration-300 hover:bg-background/90"
             />
           </div>
 
@@ -170,7 +184,7 @@ export default function HomePage() {
               placeholder="Enter Room ID"
               value={roomId}
               onChange={(e) => setRoomId(e.target.value)}
-              className="bg-white/5 border-white/10 text-foreground placeholder:text-muted-foreground/50 focus-visible:ring-primary/50 focus-visible:border-primary/50 h-12 rounded-xl transition-all duration-300 hover:bg-white/10"
+              className="bg-background/80 border-border text-foreground placeholder:text-muted-foreground/50 focus-visible:ring-primary/50 focus-visible:border-primary/50 h-12 rounded-xl transition-all duration-300 hover:bg-background/90"
             />
           </div>
         </CardContent>
@@ -195,4 +209,3 @@ export default function HomePage() {
     </div>
   );
 }
-

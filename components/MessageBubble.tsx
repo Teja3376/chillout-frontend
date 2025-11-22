@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import VoiceMessagePlayer from "@/components/VoiceMessagePlayer";
+import { Phone } from "lucide-react";
 
 export default function MessageBubble({
   msg,
@@ -8,8 +9,9 @@ export default function MessageBubble({
   currentUser,
   playingAudio,
   onPlayPause,
+  onJoinCall,
 }: {
-  msg: { username: string; message: string; type?: string; url?: string };
+  msg: { username: string; message: string; type?: string; url?: string; callInitiator?: string };
   idx: number;
   currentUser: string;
   playingAudio: {
@@ -19,8 +21,33 @@ export default function MessageBubble({
     duration: number;
   };
   onPlayPause: (index: number, url: string) => void;
+  onJoinCall?: () => void;
 }) {
   const isMe = msg.username === currentUser;
+  
+  // Handle call notification messages - simple centered text
+  if (msg.type === "call_notification") {
+    return (
+      <div className="message-bubble flex justify-center my-2">
+        <div className="px-4 py-2 rounded-full bg-muted/50 border border-border/50 backdrop-blur-sm">
+          <span className="text-xs text-muted-foreground">{msg.message}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle call ended messages
+  if (msg.type === "call_ended") {
+    return (
+      <div className="message-bubble flex justify-center my-2">
+        <div className="px-4 py-2 rounded-full bg-muted/50 border border-border/50 backdrop-blur-sm">
+          <span className="text-xs text-muted-foreground">{msg.message}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Regular message bubbles
   return (
     <div
       className={`message-bubble flex ${
@@ -50,6 +77,7 @@ export default function MessageBubble({
                 index={idx}
                 playingAudio={playingAudio}
                 onPlayPause={onPlayPause}
+                isMe={isMe}
               />
             </div>
           </div>

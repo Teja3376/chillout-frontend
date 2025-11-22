@@ -16,8 +16,8 @@ const getAuthToken = () => {
 
 // Create an Axios instance
 const api = axios.create({
-  // baseURL: "http://localhost:5000/api",
-  baseURL: "https://chillout-backend-v2.onrender.com/api",
+  baseURL: "http://localhost:5000/api",
+  // baseURL: "https://chillout-backend-v2.onrender.com/api",
   headers: {
     "Content-Type": "application/json",
   },
@@ -78,6 +78,13 @@ interface Room {
  * Room-related API methods using Axios.
  */
 export const roomApi = {
+  /**
+   * Health check to verify backend is running.
+   * @returns Promise resolving to health status.
+   */
+  healthCheck: () =>
+    api.get<{ status: string; message: string; timestamp: string }>("/health").then((res) => res.data),
+
   /**
    * Retrieves a room by roomId, creating it if it doesn't exist.
    * @param roomId - ID of the room.

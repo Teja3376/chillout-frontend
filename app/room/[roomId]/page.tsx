@@ -1,17 +1,16 @@
 "use client";
+
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams, useParams } from "next/navigation";
-import {
-  useSocket,
-  useOnlineUsers,
-  SOCKET_URL,
-} from "@/components/SocketProvider";
+import { useSocket, useOnlineUsers, SOCKET_URL } from "@/components/SocketProvider";
 import HeaderBar from "@/components/HeaderBar";
 import MessageBubble from "@/components/MessageBubble";
 import InputBar from "@/components/InputBar";
 import OnlineUsersModal from "@/components/OnlineUsersModal";
 import { useGetRoom } from "@/lib/hooks";
 import { roomApi } from "@/lib/apiClient";
+import { CallProvider, useCall } from "@/components/CallProvider";
+import CallModal from "@/components/CallModal";
 
 const FlowingDots = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -46,16 +45,14 @@ const FlowingDots = () => {
 
     const render = () => {
       ctx.clearRect(0, 0, width, height);
-      
-      // Update and draw dots
-      ctx.fillStyle = "rgba(0, 255, 255, 0.6)"; // Neon Cyan
-      ctx.strokeStyle = "rgba(0, 255, 255, 0.1)";
+
+      ctx.fillStyle = "rgba(99, 102, 241, 0.8)";
+      ctx.strokeStyle = "rgba(99, 102, 241, 0.15)";
 
       dots.forEach((dot, i) => {
         dot.x += dot.vx;
         dot.y += dot.vy;
 
-        // Bounce off edges
         if (dot.x < 0 || dot.x > width) dot.vx *= -1;
         if (dot.y < 0 || dot.y > height) dot.vy *= -1;
 
@@ -63,7 +60,6 @@ const FlowingDots = () => {
         ctx.arc(dot.x, dot.y, dot.size, 0, Math.PI * 2);
         ctx.fill();
 
-        // Connect dots
         for (let j = i + 1; j < dots.length; j++) {
           const other = dots[j];
           const dx = dot.x - other.x;
@@ -111,21 +107,28 @@ export default function RoomPage() {
   const { roomId } = useParams() as { roomId: string };
   const searchParams = useSearchParams();
   const username = searchParams.get("username") || "anonymous";
+
+  return (
+    <CallProvider roomId={roomId} username={username}>
+      <RoomContent roomId={roomId} username={username} />
+    </CallProvider>
+  );
+}
+
+function RoomContent({ roomId, username }: { roomId: string; username: string }) {
   const socket = useSocket();
-  const onlineUsers = useOnlineUsers({ roomId: roomId as string });
-  const { data: roomData } = useGetRoom(roomId as string);
+  const onlineUsers = useOnlineUsers({ roomId });
+  const { data: roomData } = useGetRoom(roomId);
+  const { joinCall } = useCall();
 
   const [messages, setMessages] = useState<
-    { username: string; message: string; type?: string; url?: string }[]
+    { username: string; message: string; type?: string; url?: string; callInitiator?: string }[]
   >([]);
   const [newMessage, setNewMessage] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
-    null
-  );
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [playingAudio, setPlayingAudio] = useState<{
     index: number | null;
@@ -224,9 +227,28 @@ export default function RoomPage() {
       }
     );
 
+    socket.on("call_notification", (data: {
+      username: string;
+      message: string;
+      type: string;
+      callInitiator: string;
+    }) => {
+      setMessages((prev) => [...prev, data]);
+    });
+
+    socket.on("call_ended_notification", (data: {
+      username: string;
+      message: string;
+      type: string;
+    }) => {
+      setMessages((prev) => [...prev, data]);
+    });
+
     return () => {
       socket.off("receive_message");
       socket.off("receive_voice_message");
+      socket.off("call_notification");
+      socket.off("call_ended_notification");
     };
   }, [socket, roomId, username]);
 
@@ -357,7 +379,6 @@ export default function RoomPage() {
       if (audioRef.current) {
         try {
           audioRef.current.src = "";
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e) {}
         audioRef.current = null;
       }
@@ -398,6 +419,7 @@ export default function RoomPage() {
             currentUser={username}
             playingAudio={playingAudio}
             onPlayPause={playVoiceMessage}
+            onJoinCall={joinCall}
           />
         ))}
         <div ref={messagesEndRef} />
@@ -420,6 +442,7 @@ export default function RoomPage() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />
+      <CallModal />
     </div>
   );
 }

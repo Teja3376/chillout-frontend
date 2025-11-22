@@ -1,12 +1,12 @@
 # Chillout App
 
-A real-time chat application with a Star Wars-themed UI, allowing users to create or join chat rooms and communicate instantly with friends. Built with modern web technologies for a seamless and engaging experience.
+A real-time chat application with a modern glassmorphism UI, allowing users to create or join chat rooms, communicate instantly with friends, and make group audio calls. Built with modern web technologies for a seamless and engaging experience.
 
 ## Overview
 
-Chillout App is a Next.js-based frontend application that provides a fun, themed chat platform. Users can enter a username, specify a room ID to join an existing room or create a new one, and start chatting in real-time. The app features a Star Wars-inspired design with animated backgrounds, neon effects, and smooth transitions powered by GSAP and Tailwind CSS.
+Chillout App is a Next.js-based frontend application that provides a modern, sleek chat platform with real-time audio calling capabilities. Users can enter a username, specify a room ID to join an existing room or create a new one, and start chatting in real-time. The app features a contemporary glassmorphism design with flowing particle animations, smooth transitions powered by Framer Motion, and Tailwind CSS.
 
-The backend handles room management and real-time messaging via Socket.io, with data persisted through a REST API.
+The backend handles room management, real-time messaging, and WebRTC signaling via Socket.io, with data persisted through a REST API.
 
 ## Tech Stack
 
@@ -14,11 +14,13 @@ The backend handles room management and real-time messaging via Socket.io, with 
 - **UI Library**: React 19
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS v4
-- **Animations**: GSAP (@gsap/react), Motion
+- **Animations**: Framer Motion
 - **Real-time Communication**: Socket.io Client
+- **WebRTC**: Native browser APIs for peer-to-peer audio
 - **HTTP Client**: Axios
 - **Icons**: Lucide React
-- **3D Globe**: Cobe
+- **UI Components**: Radix UI (Dropdown Menu, Slot)
+- **Database**: Firebase (for authentication/storage)
 - **Build Tool**: Turbopack (via Next.js)
 - **Linting**: ESLint
 - **Deployment**: Vercel (Frontend), Render (Backend)
@@ -27,12 +29,20 @@ The backend handles room management and real-time messaging via Socket.io, with 
 
 - **Room Creation/Joining**: Enter a room ID to join or create a new room.
 - **Real-time Messaging**: Instant message delivery using Socket.io.
+- **Voice Messages**: Record and send voice messages with playback controls.
+- **Group Audio Calls**: WebRTC-based peer-to-peer audio calls with multiple participants.
+  - Join/leave calls with one click
+  - Mute/unmute microphone
+  - Draggable call modal (desktop) or fullscreen (mobile)
+  - Call persistence across page refreshes
+  - Conference-style UI on mobile with circular participant layout
+- **Call Notifications**: In-chat notifications when users join or leave calls.
 - **User Management**: Display online users in a modal.
 - **Responsive Design**: Mobile-friendly UI with adaptive layouts.
-- **Star Wars Theme**: Animated starfield, laser beams, holographic grids, and neon colors.
+- **Modern UI Theme**: Glassmorphism design with flowing dots background, neon accents, and smooth animations.
 - **Username Support**: Optional username input for personalization.
 - **Message History**: Load previous messages when joining a room via API.
-- **Smooth Animations**: GSAP-powered transitions and effects.
+- **Smooth Animations**: Framer Motion-powered transitions and effects.
 
 ## Installation
 
@@ -88,7 +98,16 @@ Socket.io events:
 - `join_room`: Join a room with roomId and username.
 - `send_message`: Send a message to the room.
 - `receive_message`: Receive incoming messages.
+- `send_voice_message`: Send a voice message to the room.
+- `receive_voice_message`: Receive incoming voice messages.
 - `online_users`: Get list of online users.
+- `join_call`: Join an audio call in the room.
+- `leave_call`: Leave an audio call.
+- `user_joined_call`: Notification when a user joins the call.
+- `user_left_call`: Notification when a user leaves the call.
+- `call_notification`: Chat notification when someone joins a call.
+- `call_ended_notification`: Chat notification when someone leaves a call.
+- `offer`, `answer`, `ice_candidate`: WebRTC signaling events.
 
 Backend URL: `https://chillout-backend-v2.onrender.com`
 
@@ -100,17 +119,24 @@ chillout-frontend/
 │   ├── layout.tsx          # Root layout with SocketProvider
 │   ├── page.tsx            # Home page for room entry
 │   └── room/[roomId]/
-│       └── page.tsx        # Room chat page
+│       └── page.tsx        # Room chat page with audio calls
 ├── components/
 │   ├── ui/                 # Reusable UI components (Button, Input, etc.)
-│   ├── AnimatedMessage.tsx # Message animation component
+│   ├── CallModal.tsx       # Audio call modal with WebRTC
+│   ├── CallProvider.tsx    # WebRTC and call state management
+│   ├── HeaderBar.tsx       # Room header with call controls
+│   ├── InputBar.tsx        # Message input with voice recording
+│   ├── MessageBubble.tsx   # Message display with call notifications
 │   ├── OnlineUsersModal.tsx # Modal for online users
 │   ├── SocketProvider.tsx  # Socket.io context provider
-│   └── ...
+│   ├── ThemeProvider.tsx   # Theme context provider
+│   ├── ThemeToggle.tsx     # Dark/light mode toggle
+│   └── VoiceMessagePlayer.tsx # Voice message playback
 ├── lib/
 │   ├── apiClient.ts        # Axios setup and API methods
-│   └── hooks.ts            # Custom hooks for API calls
-├── public/                 # Static assets (logo, favicon, etc.)
+│   ├── hooks.ts            # Custom hooks for API calls
+│   └── utils.ts            # Utility functions
+├── public/                 # Static assets (favicon, etc.)
 ├── styles/
 │   └── globals.css         # Global styles and animations
 └── ...
@@ -131,5 +157,5 @@ chillout-frontend/
 
 ## Acknowledgments
 
-- Inspired by Star Wars for the theme.
-- Built with Next.js, Socket.io, and modern React practices.
+- Built with Next.js, Socket.io, WebRTC, and modern React practices.
+- Designed with glassmorphism and contemporary UI principles.
