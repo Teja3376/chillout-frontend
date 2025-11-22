@@ -1,37 +1,134 @@
 "use client";
+
 import React, { useState, useEffect, useRef } from "react";
 import { useSearchParams, useParams } from "next/navigation";
-import {
-  useSocket,
-  useOnlineUsers,
-  SOCKET_URL,
-} from "@/components/SocketProvider";
+import { useSocket, useOnlineUsers, SOCKET_URL } from "@/components/SocketProvider";
 import HeaderBar from "@/components/HeaderBar";
 import MessageBubble from "@/components/MessageBubble";
 import InputBar from "@/components/InputBar";
 import OnlineUsersModal from "@/components/OnlineUsersModal";
 import { useGetRoom } from "@/lib/hooks";
 import { roomApi } from "@/lib/apiClient";
+import { CallProvider, useCall } from "@/components/CallProvider";
+import CallModal from "@/components/CallModal";
+
+const FlowingDots = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const dots: { x: number; y: number; vx: number; vy: number; size: number }[] = [];
+    const DOT_COUNT = 100;
+    const CONNECTION_DISTANCE = 150;
+
+    for (let i = 0; i < DOT_COUNT; i++) {
+      dots.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5,
+        size: Math.random() * 2 + 1,
+      });
+    }
+
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
+
+      ctx.fillStyle = "rgba(99, 102, 241, 0.8)";
+      ctx.strokeStyle = "rgba(99, 102, 241, 0.15)";
+
+      dots.forEach((dot, i) => {
+        dot.x += dot.vx;
+        dot.y += dot.vy;
+
+        if (dot.x < 0 || dot.x > width) dot.vx *= -1;
+        if (dot.y < 0 || dot.y > height) dot.vy *= -1;
+
+        ctx.beginPath();
+        ctx.arc(dot.x, dot.y, dot.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        for (let j = i + 1; j < dots.length; j++) {
+          const other = dots[j];
+          const dx = dot.x - other.x;
+          const dy = dot.y - other.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (distance < CONNECTION_DISTANCE) {
+            ctx.beginPath();
+            ctx.moveTo(dot.x, dot.y);
+            ctx.lineTo(other.x, other.y);
+            ctx.stroke();
+          }
+        }
+      });
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    const handleResize = () => {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="fixed inset-0 z-0 pointer-events-none opacity-60"
+    />
+  );
+};
 
 export default function RoomPage() {
   const { roomId } = useParams() as { roomId: string };
   const searchParams = useSearchParams();
   const username = searchParams.get("username") || "anonymous";
+
+  return (
+    <CallProvider roomId={roomId} username={username}>
+      <RoomContent roomId={roomId} username={username} />
+    </CallProvider>
+  );
+}
+
+function RoomContent({ roomId, username }: { roomId: string; username: string }) {
   const socket = useSocket();
-  const onlineUsers = useOnlineUsers({ roomId: roomId as string });
-  const { data: roomData } = useGetRoom(roomId as string);
+  const onlineUsers = useOnlineUsers({ roomId });
+  const { data: roomData } = useGetRoom(roomId);
+  const { joinCall } = useCall();
 
   const [messages, setMessages] = useState<
-    { username: string; message: string; type?: string; url?: string }[]
+    { username: string; message: string; type?: string; url?: string; callInitiator?: string }[]
   >([]);
   const [newMessage, setNewMessage] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(
-    null
-  );
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [playingAudio, setPlayingAudio] = useState<{
     index: number | null;
@@ -130,9 +227,28 @@ export default function RoomPage() {
       }
     );
 
+    socket.on("call_notification", (data: {
+      username: string;
+      message: string;
+      type: string;
+      callInitiator: string;
+    }) => {
+      setMessages((prev) => [...prev, data]);
+    });
+
+    socket.on("call_ended_notification", (data: {
+      username: string;
+      message: string;
+      type: string;
+    }) => {
+      setMessages((prev) => [...prev, data]);
+    });
+
     return () => {
       socket.off("receive_message");
       socket.off("receive_voice_message");
+      socket.off("call_notification");
+      socket.off("call_ended_notification");
     };
   }, [socket, roomId, username]);
 
@@ -263,7 +379,6 @@ export default function RoomPage() {
       if (audioRef.current) {
         try {
           audioRef.current.src = "";
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         } catch (e) {}
         audioRef.current = null;
       }
@@ -284,21 +399,9 @@ export default function RoomPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-black relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black animate-gradient" />
-      <div className="absolute inset-0 z-0">
-        {[...Array(80)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full opacity-60 animate-starfield"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 20}s`,
-            }}
-          />
-        ))}
-      </div>
+    <div className="min-h-screen flex flex-col bg-background relative overflow-hidden selection:bg-primary/20">
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-background to-background z-0" />
+      <FlowingDots />
 
       <HeaderBar
         roomId={roomId}
@@ -316,6 +419,7 @@ export default function RoomPage() {
             currentUser={username}
             playingAudio={playingAudio}
             onPlayPause={playVoiceMessage}
+            onJoinCall={joinCall}
           />
         ))}
         <div ref={messagesEndRef} />
@@ -331,12 +435,14 @@ export default function RoomPage() {
         recordedBlob={recordedBlob}
         previewVoiceMessage={previewVoiceMessage}
         sendRecordedVoiceMessage={sendRecordedVoiceMessage}
+        onDiscardRecording={() => setRecordedBlob(null)}
       />
 
       <OnlineUsersModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />
+      <CallModal />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import VoiceMessagePlayer from "@/components/VoiceMessagePlayer";
+import { Phone } from "lucide-react";
 
 export default function MessageBubble({
   msg,
@@ -8,8 +9,9 @@ export default function MessageBubble({
   currentUser,
   playingAudio,
   onPlayPause,
+  onJoinCall,
 }: {
-  msg: { username: string; message: string; type?: string; url?: string };
+  msg: { username: string; message: string; type?: string; url?: string; callInitiator?: string };
   idx: number;
   currentUser: string;
   playingAudio: {
@@ -19,8 +21,33 @@ export default function MessageBubble({
     duration: number;
   };
   onPlayPause: (index: number, url: string) => void;
+  onJoinCall?: () => void;
 }) {
   const isMe = msg.username === currentUser;
+  
+  // Handle call notification messages - simple centered text
+  if (msg.type === "call_notification") {
+    return (
+      <div className="message-bubble flex justify-center my-2">
+        <div className="px-4 py-2 rounded-full bg-muted/50 border border-border/50 backdrop-blur-sm">
+          <span className="text-xs text-muted-foreground">{msg.message}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle call ended messages
+  if (msg.type === "call_ended") {
+    return (
+      <div className="message-bubble flex justify-center my-2">
+        <div className="px-4 py-2 rounded-full bg-muted/50 border border-border/50 backdrop-blur-sm">
+          <span className="text-xs text-muted-foreground">{msg.message}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Regular message bubbles
   return (
     <div
       className={`message-bubble flex ${
@@ -28,14 +55,14 @@ export default function MessageBubble({
       }`}
     >
       <div
-        className={`max-w-xs sm:max-w-sm px-4 sm:px-6 py-3 sm:py-4 rounded-3xl shadow-2xl backdrop-blur-sm border-2 ${
+        className={`max-w-xs sm:max-w-sm px-4 sm:px-6 py-3 sm:py-4 rounded-3xl shadow-lg backdrop-blur-md border ${
           isMe
-            ? "bg-gradient-to-r from-red-900 to-red-700 text-white rounded-br-md light-saber-red"
-            : "bg-gradient-to-r from-green-900 to-green-700 text-white rounded-bl-md light-saber-green"
-        } transition-all duration-500 hover:shadow-neon-green/20`}
+            ? "bg-primary/90 text-primary-foreground rounded-br-sm border-primary/50 shadow-[0_0_15px_rgba(var(--primary),0.3)]"
+            : "bg-card/90 text-card-foreground rounded-bl-sm border-white/10 shadow-[0_0_15px_rgba(0,0,0,0.2)]"
+        } transition-all duration-300 hover:scale-[1.02]`}
         style={{ width: "auto" }}
       >
-        <p className="text-sm font-bold opacity-90 mb-2 flex items-center">
+        <p className={`text-xs font-bold opacity-80 mb-1 flex items-center ${isMe ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
           {isMe ? "You" : msg.username}
         </p>
 
@@ -45,19 +72,17 @@ export default function MessageBubble({
               className="px-3 py-2 rounded-lg "
               style={{ minWidth: 220, maxWidth: 420 }}
             >
-              {/* <p className="text-xs text-gray-300 font-semibold mb-2">
-                {isMe ? "You" : msg.username}
-              </p> */}
               <VoiceMessagePlayer
                 src={msg.url}
                 index={idx}
                 playingAudio={playingAudio}
                 onPlayPause={onPlayPause}
+                isMe={isMe}
               />
             </div>
           </div>
         ) : (
-          <p className="break-words text-lg">{msg.message}</p>
+          <p className="break-words text-base sm:text-lg leading-relaxed">{msg.message}</p>
         )}
       </div>
     </div>

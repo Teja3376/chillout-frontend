@@ -79,6 +79,13 @@ interface Room {
  */
 export const roomApi = {
   /**
+   * Health check to verify backend is running.
+   * @returns Promise resolving to health status.
+   */
+  healthCheck: () =>
+    api.get<{ status: string; message: string; timestamp: string }>("/health").then((res) => res.data),
+
+  /**
    * Retrieves a room by roomId, creating it if it doesn't exist.
    * @param roomId - ID of the room.
    * @returns Promise resolving to the room data.
