@@ -1,5 +1,6 @@
 import { SocketProvider } from "@/components/SocketProvider";
 import { TailwindIndicator } from "@/components/TailwindIndicator";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import "@/styles/globals.css";
 
 export const metadata = {
@@ -19,8 +20,15 @@ export default function RootLayout({
     <html lang="en">
       <body className="">
         <SocketProvider>
-          <main className="">{children}</main>
-          <TailwindIndicator />
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="dark"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <main className="">{children}</main>
+            <TailwindIndicator />
+          </ThemeProvider>
         </SocketProvider>
       </body>
     </html>

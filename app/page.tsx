@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,9 +12,102 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import Image from "next/image";
+import { Loader2 } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
-// ✅ Anime.js v4 import (works with Next.js)
-// import * as anime from "animejs";
+const FlowingDots = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const dots: { x: number; y: number; vx: number; vy: number; size: number }[] = [];
+    const DOT_COUNT = 100;
+    const CONNECTION_DISTANCE = 150;
+
+    for (let i = 0; i < DOT_COUNT; i++) {
+      dots.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5,
+        size: Math.random() * 2 + 1,
+      });
+    }
+
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
+      
+      // Update and draw dots
+      ctx.fillStyle = "rgba(99, 102, 241, 0.8)"; // Indigo
+      ctx.strokeStyle = "rgba(99, 102, 241, 0.15)";
+
+      dots.forEach((dot, i) => {
+        dot.x += dot.vx;
+        dot.y += dot.vy;
+
+        // Bounce off edges
+        if (dot.x < 0 || dot.x > width) dot.vx *= -1;
+        if (dot.y < 0 || dot.y > height) dot.vy *= -1;
+
+        ctx.beginPath();
+        ctx.arc(dot.x, dot.y, dot.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Connect dots
+        for (let j = i + 1; j < dots.length; j++) {
+          const other = dots[j];
+          const dx = dot.x - other.x;
+          const dy = dot.y - other.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (distance < CONNECTION_DISTANCE) {
+            ctx.beginPath();
+            ctx.moveTo(dot.x, dot.y);
+            ctx.lineTo(other.x, other.y);
+            ctx.stroke();
+          }
+        }
+      });
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    const handleResize = () => {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 z-0 pointer-events-none opacity-60"
+    />
+  );
+};
 
 export default function HomePage() {
   const [roomId, setRoomId] = useState("");
@@ -32,99 +125,74 @@ export default function HomePage() {
     }, 1500);
   };
 
-  // Removed problematic animations to fix bugs
-
   return (
-    <div className="w-full h-full flex items-center justify-center min-h-screen bg-black p-4 sm:p-6 relative overflow-hidden">
-      {/* Animated Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black animate-gradient"></div>
+    <div className="w-full h-full flex items-center justify-center min-h-screen bg-background p-4 sm:p-6 relative overflow-hidden selection:bg-primary/20">
+      {/* Background Effects */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-background to-background z-0"></div>
+      <FlowingDots />
 
-      {/* Star Wars Background - Floating Stars */}
-      <div className="absolute inset-0 z-0">
-        {[...Array(80)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full opacity-60 animate-starfield"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 20}s`,
-            }}
-          />
-        ))}
+      <div className="absolute top-4 right-4 z-50">
+        <ThemeToggle />
       </div>
 
-      {/* Laser Beam Effects */}
-      <div className="absolute inset-0 z-0">
-        {[...Array(3)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 bg-gradient-to-b from-transparent via-neon-red to-transparent opacity-30 animate-laser"
-            style={{
-              left: `${25 + i * 25}%`,
-              top: "0",
-              height: "100%",
-              animationDelay: `${i * 3}s`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Holographic Grid */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute top-1/3 left-0 w-full h-px bg-gradient-to-r from-transparent via-neon-blue to-transparent opacity-20 animate-hologram"></div>
-        <div className="absolute top-2/3 left-0 w-full h-px bg-gradient-to-r from-transparent via-neon-purple to-transparent opacity-20 animate-hologram"></div>
-        <div className="absolute left-1/3 top-0 w-px h-full bg-gradient-to-b from-transparent via-neon-pink to-transparent opacity-20 animate-hologram"></div>
-        <div className="absolute left-2/3 top-0 w-px h-full bg-gradient-to-b from-transparent via-neon-green to-transparent opacity-20 animate-hologram"></div>
-      </div>
-
-      <Card className="card-container w-full max-w-md mx-4 sm:mx-auto bg-gray-900/80 backdrop-blur-2xl border border-neon-green/30 shadow-2xl rounded-3xl transition-all duration-500 hover:shadow-neon-green/20 hover:border-neon-green/50 relative z-10 animate-glow">
-        <CardHeader className="text-center">
-          <CardTitle className="text-4xl sm:text-6xl font-extrabold mb-4">
-            <Image
-              src="/logo.png"
-              alt="Chillout Logo"
-              width={80}
-              height={80}
-              className="mx-auto mb-4 sm:w-24 sm:h-24"
-            />
+      <Card className="w-full max-w-md mx-auto bg-card/30 backdrop-blur-xl border-white/10 shadow-2xl rounded-3xl relative z-10 animate-float-slow overflow-hidden ring-1 ring-white/5">
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none"></div>
+        
+        <CardHeader className="text-center relative z-10 pt-10">
+          <div className="mx-auto mb-6 relative w-24 h-24 flex items-center justify-center">
+             <div className="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse-glow"></div>
+             <div className="relative z-10 bg-background/50 p-4 rounded-2xl border border-white/10 backdrop-blur-md shadow-inner flex items-center justify-center">
+                <span className="text-4xl">🌌</span>
+             </div>
+          </div>
+          <CardTitle className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary via-indigo-400 to-primary">
+            Chillout
           </CardTitle>
-          <p className="text-sm text-gray-300 mt-2 animate-pulse neon-green">
-            Join an existing room or create a new one to get started.
+          <p className="text-muted-foreground mt-2 text-sm font-medium tracking-wide">
+            Connect. Collaborate. Create.
           </p>
         </CardHeader>
 
-        <CardContent className="space-y-5">
-          <Input
-            placeholder="Enter your username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="input-field bg-gray-800/50 border-neon-blue/30 text-white placeholder:text-gray-400 focus-visible:ring-neon-blue rounded-xl shadow-lg backdrop-blur-sm hover:border-neon-blue/50 transition-all duration-300"
-          />
+        <CardContent className="space-y-6 relative z-10 px-8">
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Display Name</label>
+            <Input
+              placeholder="Enter your username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="bg-white/5 border-white/10 text-foreground placeholder:text-muted-foreground/50 focus-visible:ring-primary/50 focus-visible:border-primary/50 h-12 rounded-xl transition-all duration-300 hover:bg-white/10"
+            />
+          </div>
 
-          <Input
-            placeholder="Enter Room ID"
-            value={roomId}
-            onChange={(e) => setRoomId(e.target.value)}
-            className="input-field bg-gray-800/50 border-neon-purple/30 text-white placeholder:text-gray-400 focus-visible:ring-neon-purple rounded-xl shadow-lg backdrop-blur-sm hover:border-neon-purple/50 transition-all duration-300"
-          />
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Room ID</label>
+            <Input
+              placeholder="Enter Room ID"
+              value={roomId}
+              onChange={(e) => setRoomId(e.target.value)}
+              className="bg-white/5 border-white/10 text-foreground placeholder:text-muted-foreground/50 focus-visible:ring-primary/50 focus-visible:border-primary/50 h-12 rounded-xl transition-all duration-300 hover:bg-white/10"
+            />
+          </div>
         </CardContent>
 
-        <CardFooter className="flex flex-col gap-4">
+        <CardFooter className="flex flex-col gap-4 relative z-10 pb-10 px-8">
           <Button
-            className="join-button w-full bg-gradient-to-r from-neon-blue via-neon-purple to-neon-pink hover:from-neon-blue/80 hover:via-neon-purple/80 hover:to-neon-pink/80 text-white font-semibold rounded-xl py-3 text-lg shadow-lg transition-all duration-300 hover:shadow-xl hover:scale-105 animate-glow"
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl h-12 text-base shadow-lg shadow-primary/25 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
             onClick={handleJoin}
             disabled={isLoading}
           >
-            {isLoading ? "Connecting to the Force..." : "Create / Join Room"}
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Connecting...
+              </>
+            ) : (
+              "Enter Room"
+            )}
           </Button>
-
-          <p className="text-xs text-gray-400 text-center">
-            Enter a Room ID to join an existing room, or type a new one to
-            create it.
-          </p>
         </CardFooter>
       </Card>
     </div>
   );
 }
+

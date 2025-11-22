@@ -16,32 +16,33 @@ export default function OnlineUsersModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-gray-900/90 border border-neon-green/30 rounded-2xl p-6 max-w-md w-full shadow-2xl">
+    <div className="fixed inset-0 bg-background/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-card/90 border border-border/50 rounded-2xl p-6 max-w-md w-full shadow-2xl ring-1 ring-white/5">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-neon-green">Online Users</h2>
+          <h2 className="text-xl font-bold text-foreground tracking-tight">Online Users</h2>
           <Button
             onClick={onClose}
-            className="text-gray-400 hover:text-white bg-transparent hover:bg-gray-800 rounded-full p-2"
+            variant="ghost"
+            className="text-muted-foreground hover:text-foreground rounded-full p-2 h-8 w-8"
           >
             ✕
           </Button>
         </div>
-        <div className="space-y-2 max-h-64 overflow-y-auto">
+        <div className="space-y-2 max-h-64 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
           {onlineUsers.length > 0 ? (
             onlineUsers.map((user, index) => (
               <div
                 key={index}
-                className="flex items-center space-x-3 p-3 bg-gray-800/50 rounded-lg border border-gray-700/50"
+                className="flex items-center space-x-3 p-3 bg-accent/30 rounded-xl border border-border/30 transition-colors hover:bg-accent/50"
               >
-                <div className="w-8 h-8 bg-gradient-to-r from-neon-green to-neon-purple rounded-full flex items-center justify-center text-white font-bold">
+                <div className="w-8 h-8 bg-primary/20 text-primary rounded-full flex items-center justify-center font-bold text-sm ring-1 ring-primary/30">
                   {user.charAt(0).toUpperCase()}
                 </div>
-                <span className="text-white font-medium">{user}</span>
+                <span className="text-foreground font-medium text-sm">{user}</span>
               </div>
             ))
           ) : (
-            <p className="text-gray-400 text-center py-4">No users online</p>
+            <p className="text-muted-foreground text-center py-8 text-sm">No users online</p>
           )}
         </div>
       </div>

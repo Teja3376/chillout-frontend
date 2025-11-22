@@ -13,6 +13,100 @@ import OnlineUsersModal from "@/components/OnlineUsersModal";
 import { useGetRoom } from "@/lib/hooks";
 import { roomApi } from "@/lib/apiClient";
 
+const FlowingDots = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const dots: { x: number; y: number; vx: number; vy: number; size: number }[] = [];
+    const DOT_COUNT = 100;
+    const CONNECTION_DISTANCE = 150;
+
+    for (let i = 0; i < DOT_COUNT; i++) {
+      dots.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5,
+        size: Math.random() * 2 + 1,
+      });
+    }
+
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
+      
+      // Update and draw dots
+      ctx.fillStyle = "rgba(0, 255, 255, 0.6)"; // Neon Cyan
+      ctx.strokeStyle = "rgba(0, 255, 255, 0.1)";
+
+      dots.forEach((dot, i) => {
+        dot.x += dot.vx;
+        dot.y += dot.vy;
+
+        // Bounce off edges
+        if (dot.x < 0 || dot.x > width) dot.vx *= -1;
+        if (dot.y < 0 || dot.y > height) dot.vy *= -1;
+
+        ctx.beginPath();
+        ctx.arc(dot.x, dot.y, dot.size, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Connect dots
+        for (let j = i + 1; j < dots.length; j++) {
+          const other = dots[j];
+          const dx = dot.x - other.x;
+          const dy = dot.y - other.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (distance < CONNECTION_DISTANCE) {
+            ctx.beginPath();
+            ctx.moveTo(dot.x, dot.y);
+            ctx.lineTo(other.x, other.y);
+            ctx.stroke();
+          }
+        }
+      });
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    const handleResize = () => {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = width;
+      canvas.height = height;
+    };
+
+    window.addEventListener("resize", handleResize);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="fixed inset-0 z-0 pointer-events-none opacity-60"
+    />
+  );
+};
+
 export default function RoomPage() {
   const { roomId } = useParams() as { roomId: string };
   const searchParams = useSearchParams();
@@ -284,21 +378,9 @@ export default function RoomPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-black relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black animate-gradient" />
-      <div className="absolute inset-0 z-0">
-        {[...Array(80)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full opacity-60 animate-starfield"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 20}s`,
-            }}
-          />
-        ))}
-      </div>
+    <div className="min-h-screen flex flex-col bg-background relative overflow-hidden selection:bg-primary/20">
+      <div className="fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-900/20 via-background to-background z-0" />
+      <FlowingDots />
 
       <HeaderBar
         roomId={roomId}
@@ -331,6 +413,7 @@ export default function RoomPage() {
         recordedBlob={recordedBlob}
         previewVoiceMessage={previewVoiceMessage}
         sendRecordedVoiceMessage={sendRecordedVoiceMessage}
+        onDiscardRecording={() => setRecordedBlob(null)}
       />
 
       <OnlineUsersModal
