@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { PlayIcon, PauseIcon } from "lucide-react";
+import { PlayIcon, PauseIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 function formatTime(sec: number) {
@@ -24,6 +24,7 @@ export default function VoiceMessagePlayer({
     isPlaying: boolean;
     currentTime: number;
     duration: number;
+    isLoading: boolean;
   };
   onPlayPause: (index: number, url: string) => void;
   isMe?: boolean;
@@ -52,10 +53,13 @@ export default function VoiceMessagePlayer({
       <Button
         variant="outline"
         onClick={() => onPlayPause(index, src)}
-        className={`w-11 h-11 rounded-full flex items-center justify-center border hover:scale-105 transition-transform ${buttonClass}`}
+        disabled={current?.isLoading}
+        className={`w-11 h-11 rounded-full flex items-center justify-center border hover:scale-105 transition-transform disabled:opacity-70 disabled:cursor-not-allowed disabled:hover:scale-100 ${buttonClass}`}
         aria-label="Play voice message"
       >
-        {current?.isPlaying ? (
+        {current?.isLoading ? (
+          <Loader2 className="w-5 h-5 animate-spin" />
+        ) : current?.isPlaying ? (
           <PauseIcon className="w-5 h-5" />
         ) : (
           <PlayIcon className="w-5 h-5 ml-0.5" />

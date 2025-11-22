@@ -130,12 +130,14 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isSendingVoice, setIsSendingVoice] = useState(false);
   const [playingAudio, setPlayingAudio] = useState<{
     index: number | null;
     isPlaying: boolean;
     currentTime: number;
     duration: number;
-  }>({ index: null, isPlaying: false, currentTime: 0, duration: 0 });
+    isLoading: boolean;
+  }>({ index: null, isPlaying: false, currentTime: 0, duration: 0, isLoading: false });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -305,9 +307,16 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
   };
 
   const sendRecordedVoiceMessage = async () => {
-    if (recordedBlob) {
-      await sendVoiceMessage(recordedBlob);
-      setRecordedBlob(null);
+    if (recordedBlob && !isSendingVoice) {
+      setIsSendingVoice(true);
+      try {
+        await sendVoiceMessage(recordedBlob);
+        setRecordedBlob(null);
+      } catch (error) {
+        console.error("Error sending recorded voice message:", error);
+      } finally {
+        setIsSendingVoice(false);
+      }
     }
   };
 
@@ -351,6 +360,15 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
       }
     }
 
+    // Set loading state immediately
+    setPlayingAudio({
+      index,
+      isPlaying: false,
+      currentTime: 0,
+      duration: 0,
+      isLoading: true,
+    });
+
     const audio = new Audio(url);
     audioRef.current = audio;
 
@@ -360,6 +378,7 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
         isPlaying: true,
         currentTime: 0,
         duration: audio.duration || 0,
+        isLoading: false,
       });
     };
     audio.ontimeupdate = () => {
@@ -375,6 +394,7 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
         isPlaying: false,
         currentTime: 0,
         duration: 0,
+        isLoading: false,
       });
       if (audioRef.current) {
         try {
@@ -390,11 +410,19 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
         isPlaying: false,
         currentTime: 0,
         duration: 0,
+        isLoading: false,
       });
     };
 
     audio.play().catch((err) => {
       console.error("Play prevented:", err);
+      setPlayingAudio({
+        index: null,
+        isPlaying: false,
+        currentTime: 0,
+        duration: 0,
+        isLoading: false,
+      });
     });
   };
 
@@ -436,6 +464,7 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
         previewVoiceMessage={previewVoiceMessage}
         sendRecordedVoiceMessage={sendRecordedVoiceMessage}
         onDiscardRecording={() => setRecordedBlob(null)}
+        isSendingVoice={isSendingVoice}
       />
 
       <OnlineUsersModal

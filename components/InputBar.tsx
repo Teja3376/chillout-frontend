@@ -16,6 +16,7 @@ export default function InputBar({
   previewVoiceMessage,
   sendRecordedVoiceMessage,
   onDiscardRecording,
+  isSendingVoice,
 }: {
   newMessage: string;
   setNewMessage: (v: string) => void;
@@ -27,6 +28,7 @@ export default function InputBar({
   previewVoiceMessage: () => void;
   sendRecordedVoiceMessage: () => void;
   onDiscardRecording: () => void;
+  isSendingVoice: boolean;
 }) {
   const [isPlayingPreview, setIsPlayingPreview] = React.useState(false);
   const [previewProgress, setPreviewProgress] = React.useState(0);
@@ -122,7 +124,8 @@ export default function InputBar({
 
           <Button
             onClick={sendRecordedVoiceMessage}
-            className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-[0_0_15px_rgba(var(--primary),0.4)] transition-all hover:scale-105 px-6"
+            disabled={isSendingVoice}
+            className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-[0_0_15px_rgba(var(--primary),0.4)] transition-all hover:scale-105 px-6 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             <SendIcon className="w-5 h-5" />
           </Button>
