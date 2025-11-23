@@ -2,12 +2,12 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useCall } from "./CallProvider";
-import { Mic, MicOff, PhoneOff, Minimize2, Maximize2, GripHorizontal, Video, VideoOff } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Minimize2, Maximize2, Video, VideoOff, RefreshCw } from "lucide-react";
 import { Button } from "./ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function CallModal() {
-  const { isInCall, leaveCall, participants, isMuted, toggleMute, localStream, remoteStreams, peerUsernames, isVideoEnabled, toggleVideo } = useCall();
+  const { isInCall, leaveCall, participants, isMuted, toggleMute, localStream, remoteStreams, peerUsernames, isVideoEnabled, toggleVideo, toggleCamera } = useCall();
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const constraintsRef = useRef(null);
@@ -179,16 +179,24 @@ export default function CallModal() {
                 </Button>
 
                 <Button
-                    variant={!isVideoEnabled ? "destructive" : "secondary"}
-                    size="icon"
-                    className={`rounded-full w-14 h-14 shadow-lg transition-all ${
-                        !isVideoEnabled 
-                        ? "bg-red-500/20 text-red-500 hover:bg-red-500/30 border border-red-500/50" 
-                        : "bg-white/10 text-white hover:bg-white/20 border border-white/10"
-                    }`}
                     onClick={toggleVideo}
+                    variant={isVideoEnabled ? "default" : "destructive"}
+                    className={`rounded-full w-14 h-14 shadow-lg transition-all ${
+                        isVideoEnabled 
+                        ? "bg-primary hover:bg-primary/90" 
+                        : "bg-red-500 hover:bg-red-600"
+                    }`}
                 >
-                    {!isVideoEnabled ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                    {isVideoEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
+                </Button>
+
+                {/* Switch Camera Button (Mobile Only) */}
+                <Button
+                    onClick={toggleCamera}
+                    variant="secondary"
+                    className="rounded-full w-14 h-14 flex md:hidden items-center justify-center transition-all duration-300 bg-secondary/80 hover:bg-secondary"
+                >
+                    <RefreshCw className="w-6 h-6" />
                 </Button>
 
                 <Button
