@@ -2,12 +2,12 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useCall } from "./CallProvider";
-import { Mic, MicOff, PhoneOff, Minimize2, Maximize2, GripHorizontal } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Minimize2, Maximize2, GripHorizontal, Video, VideoOff } from "lucide-react";
 import { Button } from "./ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function CallModal() {
-  const { isInCall, leaveCall, participants, isMuted, toggleMute } = useCall();
+  const { isInCall, leaveCall, participants, isMuted, toggleMute, localStream, remoteStreams, peerUsernames, isVideoEnabled, toggleVideo } = useCall();
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const constraintsRef = useRef(null);
@@ -21,9 +21,64 @@ export default function CallModal() {
 
   if (!isInCall) return null;
 
+  // Helper to render video or avatar
+  const renderParticipantMedia = (stream: MediaStream | null, username: string, isLocal: boolean = false) => {
+    const hasVideo = stream && stream.getVideoTracks().length > 0 && stream.getVideoTracks()[0].enabled;
+    
+    // For local stream, we check our own state
+    const showVideo = isLocal ? isVideoEnabled : hasVideo;
+
+    return (
+      <div className="relative w-full h-full bg-black/40 flex items-center justify-center overflow-hidden rounded-xl border border-white/10 group">
+        {showVideo && stream ? (
+          <video
+            ref={(el) => {
+              if (el) {
+                el.srcObject = stream;
+                if (isLocal) el.muted = true; // Mute local video to prevent feedback
+              }
+            }}
+            autoPlay
+            playsInline
+            className={`w-full h-full object-cover ${isLocal ? "scale-x-[-1]" : ""}`}
+          />
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 border-2 border-primary/40 flex items-center justify-center text-2xl font-bold text-foreground shadow-lg backdrop-blur-sm">
+              {username.charAt(0).toUpperCase()}
+            </div>
+          </div>
+        )}
+        
+        {/* Name Tag */}
+        <div className="absolute bottom-3 left-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-lg border border-white/10 flex items-center gap-2">
+           <span className="text-xs font-medium text-white">{username} {isLocal && "(You)"}</span>
+           {!showVideo && <VideoOff className="w-3 h-3 text-red-400" />}
+           {/* We can add mute status here if we track it per user */}
+        </div>
+
+        {/* Audio Indicator (Simple visualizer placeholder) */}
+        <div className="absolute top-3 right-3">
+             <div className={`w-2 h-2 rounded-full ${isLocal ? (isMuted ? "bg-red-500" : "bg-green-500") : "bg-green-500"} animate-pulse`} />
+        </div>
+      </div>
+    );
+  };
+
+  // Grid calculation
+  const totalParticipants = participants.length; // Includes self if logic adds self to participants, otherwise +1
+  // In CallProvider, we added self to participants.
+  
+  const getGridClass = (count: number) => {
+      if (count === 1) return "grid-cols-1";
+      if (count === 2) return "grid-cols-1 sm:grid-cols-2";
+      if (count <= 4) return "grid-cols-2";
+      return "grid-cols-2 sm:grid-cols-3";
+  };
+
   return (
     <>
-      {/* Constraint area for dragging - restricted to chat area (below header, above input) */}
+      {/* Constraint area for dragging */}
       <div ref={constraintsRef} className="fixed top-16 bottom-24 left-0 right-0 pointer-events-none z-0" />
 
       <AnimatePresence mode="wait">
@@ -68,164 +123,83 @@ export default function CallModal() {
             exit={!isMobile ? { opacity: 0, scale: 0.95, y: 20 } : {}}
             className={`fixed z-50 overflow-hidden pointer-events-auto flex flex-col transition-all duration-300 ${
               isMobile 
-                ? "inset-0 bg-gradient-to-b from-primary/20 via-background to-background" 
-                : "bottom-24 right-4 w-80 bg-card/95 backdrop-blur-md border border-primary/20 rounded-2xl shadow-2xl ring-1 ring-white/10"
+                ? "inset-0 bg-background" 
+                : "top-20 bottom-24 right-4 left-4 sm:left-auto sm:w-[800px] sm:h-[600px] bg-card/95 backdrop-blur-xl border border-primary/20 rounded-2xl shadow-2xl ring-1 ring-white/10"
             }`}
           >
-            {/* Mobile Header - Compact */}
-            {isMobile ? (
-              <div className="p-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-                  <span className="text-lg font-bold text-primary">Voice Chat</span>
+            {/* Header */}
+            <div className="absolute top-0 left-0 right-0 p-4 z-20 flex justify-between items-start bg-gradient-to-b from-black/60 to-transparent pointer-events-none">
+                <div className="pointer-events-auto flex items-center gap-2 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                    <span className="text-xs font-bold text-white/90">
+                        {participants.length} Participant{participants.length !== 1 && 's'}
+                    </span>
                 </div>
                 <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-10 w-10 rounded-full hover:bg-primary/10"
-                  onClick={() => setIsMinimized(true)}
-                >
-                  <Minimize2 className="w-5 h-5 text-muted-foreground" />
-                </Button>
-              </div>
-            ) : (
-              /* Desktop Header */
-              <div className="bg-primary/10 p-4 border-b border-primary/10 flex justify-between items-center cursor-grab active:cursor-grabbing">
-                <div className="flex items-center gap-2">
-                  <GripHorizontal className="w-4 h-4 text-muted-foreground/50" />
-                  <h3 className="font-bold text-primary flex items-center gap-2 text-sm">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                    </span>
-                    Voice Chat
-                  </h3>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 rounded-full hover:bg-primary/10"
+                    className="pointer-events-auto h-8 w-8 rounded-full bg-black/40 hover:bg-white/10 text-white border border-white/10"
                     onClick={() => setIsMinimized(true)}
-                  >
-                    <Minimize2 className="w-4 h-4 text-muted-foreground" />
-                  </Button>
-                </div>
-              </div>
-            )}
+                >
+                    <Minimize2 className="w-4 h-4" />
+                </Button>
+            </div>
 
-            {/* Participants - Different layouts for mobile vs desktop */}
-            {isMobile ? (
-              /* Mobile: Conference call style with circular arrangement */
-              <div className="flex-1 flex flex-col items-center justify-center px-8 py-4">
-                <div className="relative w-full max-w-sm aspect-square flex items-center justify-center mb-8">
-                  {participants.map((user, index) => {
-                    const angle = (index * 360) / participants.length;
-                    const radius = participants.length > 2 ? 35 : 25;
-                    const x = Math.cos((angle - 90) * Math.PI / 180) * radius;
-                    const y = Math.sin((angle - 90) * Math.PI / 180) * radius;
-                    
+            {/* Main Grid */}
+            <div className={`flex-1 p-4 grid gap-4 overflow-y-auto ${getGridClass(totalParticipants)}`}>
+                {/* Local User */}
+                <div className="aspect-video sm:aspect-auto min-h-[200px]">
+                    {renderParticipantMedia(localStream, "You", true)}
+                </div>
+
+                {/* Remote Users */}
+                {Array.from(remoteStreams.entries()).map(([socketId, stream]) => {
+                    const username = peerUsernames.get(socketId) || "Unknown User";
                     return (
-                      <div
-                        key={user}
-                        className="absolute"
-                        style={{
-                          left: `calc(50% + ${x}%)`,
-                          top: `calc(50% + ${y}%)`,
-                          transform: 'translate(-50%, -50%)'
-                        }}
-                      >
-                        <div className="flex flex-col items-center gap-2">
-                          <div className="relative">
-                            <div className="absolute inset-0 rounded-full bg-primary/20 animate-pulse"></div>
-                            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/30 to-accent/30 border-4 border-primary/40 flex items-center justify-center text-3xl font-bold text-foreground shadow-2xl relative z-10 backdrop-blur-sm">
-                              {user.charAt(0).toUpperCase()}
-                            </div>
-                          </div>
-                          <span className="text-sm font-medium text-foreground/80 bg-background/60 px-3 py-1 rounded-full backdrop-blur-sm">
-                            {user}
-                          </span>
+                        <div key={socketId} className="aspect-video sm:aspect-auto min-h-[200px]">
+                            {renderParticipantMedia(stream, username, false)}
                         </div>
-                      </div>
                     );
-                  })}
-                </div>
-              </div>
-            ) : (
-              /* Desktop: Grid layout */
-              <div className="p-4 overflow-y-auto">
-                <div className="grid grid-cols-3 gap-3">
-                  {participants.map((user) => (
-                    <div key={user} className="flex flex-col items-center gap-1">
-                      <div className="relative">
-                        <div className="absolute inset-0 rounded-full bg-primary/30 animate-ping opacity-0 group-hover:opacity-100" /> 
-                        <div className="w-12 h-12 rounded-full bg-accent/50 border border-primary/20 flex items-center justify-center text-lg font-bold text-foreground shadow-sm relative group z-10">
-                          {user.charAt(0).toUpperCase()}
-                          <div className="absolute inset-0 rounded-full border-2 border-primary opacity-0 transition-opacity duration-300" />
-                        </div>
-                      </div>
-                      <span className="text-xs text-muted-foreground truncate w-full text-center font-medium">
-                        {user}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                })}
+            </div>
 
-            {/* Controls - Different for mobile vs desktop */}
-            {isMobile ? (
-              /* Mobile: Conference call style controls */
-              <div className="pb-8 px-8 space-y-6">
-                <div className="flex justify-center gap-8">
-                  <Button
-                    variant="ghost"
+            {/* Controls Bar */}
+            <div className="p-6 flex justify-center items-center gap-6 bg-black/40 backdrop-blur-md border-t border-white/10">
+                <Button
+                    variant={isMuted ? "destructive" : "secondary"}
                     size="icon"
-                    className={`rounded-full w-16 h-16 shadow-lg transition-all ${
-                      isMuted 
-                        ? "bg-red-500/20 text-red-500 hover:bg-red-500/30 border-2 border-red-500/50" 
-                        : "bg-primary/10 text-primary hover:bg-primary/20 border-2 border-primary/30"
+                    className={`rounded-full w-14 h-14 shadow-lg transition-all ${
+                        isMuted 
+                        ? "bg-red-500/20 text-red-500 hover:bg-red-500/30 border border-red-500/50" 
+                        : "bg-white/10 text-white hover:bg-white/20 border border-white/10"
                     }`}
                     onClick={toggleMute}
-                  >
-                    {isMuted ? <MicOff className="w-7 h-7" /> : <Mic className="w-7 h-7" />}
-                  </Button>
-                </div>
-                
-                <div className="flex justify-center">
-                  <Button
+                >
+                    {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
+                </Button>
+
+                <Button
+                    variant={!isVideoEnabled ? "destructive" : "secondary"}
+                    size="icon"
+                    className={`rounded-full w-14 h-14 shadow-lg transition-all ${
+                        !isVideoEnabled 
+                        ? "bg-red-500/20 text-red-500 hover:bg-red-500/30 border border-red-500/50" 
+                        : "bg-white/10 text-white hover:bg-white/20 border border-white/10"
+                    }`}
+                    onClick={toggleVideo}
+                >
+                    {!isVideoEnabled ? <VideoOff className="w-6 h-6" /> : <Video className="w-6 h-6" />}
+                </Button>
+
+                <Button
                     variant="destructive"
                     size="icon"
-                    className="rounded-full w-20 h-20 shadow-2xl bg-red-600 hover:bg-red-700 text-white border-4 border-red-500/30"
+                    className="rounded-full w-16 h-16 shadow-2xl bg-red-600 hover:bg-red-700 text-white border-4 border-red-500/30"
                     onClick={leaveCall}
-                  >
-                    <PhoneOff className="w-10 h-10" />
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              /* Desktop: Compact controls */
-              <div className="p-4 bg-background/50 border-t border-primary/10 flex justify-center gap-6">
-                <Button
-                  variant={isMuted ? "destructive" : "secondary"}
-                  size="icon"
-                  className={`rounded-full w-12 h-12 shadow-md transition-all ${
-                    isMuted ? "bg-red-500/20 text-red-500 hover:bg-red-500/30" : "bg-accent hover:bg-accent/80"
-                  }`}
-                  onClick={toggleMute}
                 >
-                  {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                    <PhoneOff className="w-8 h-8" />
                 </Button>
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="rounded-full w-12 h-12 shadow-md bg-red-600 hover:bg-red-700 text-white"
-                  onClick={leaveCall}
-                >
-                  <PhoneOff className="w-5 h-5" />
-                </Button>
-              </div>
-            )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
