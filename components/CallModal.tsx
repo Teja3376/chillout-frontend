@@ -65,15 +65,15 @@ export default function CallModal() {
     );
   };
 
+
   // Grid calculation
-  const totalParticipants = participants.length; // Includes self if logic adds self to participants, otherwise +1
-  // In CallProvider, we added self to participants.
+  const totalParticipants = participants.length;
   
   const getGridClass = (count: number) => {
-      if (count === 1) return "grid-cols-1";
-      if (count === 2) return "grid-cols-1 sm:grid-cols-2";
-      if (count <= 4) return "grid-cols-2";
-      return "grid-cols-2 sm:grid-cols-3";
+      if (count === 1) return "grid-cols-1 grid-rows-1";
+      if (count === 2) return "grid-cols-1 grid-rows-2 sm:grid-cols-2 sm:grid-rows-1";
+      if (count <= 4) return "grid-cols-2 grid-rows-2";
+      return "grid-cols-2 sm:grid-cols-3 auto-rows-fr";
   };
 
   return (
@@ -146,9 +146,9 @@ export default function CallModal() {
             </div>
 
             {/* Main Grid */}
-            <div className={`flex-1 p-4 grid gap-4 overflow-y-auto ${getGridClass(totalParticipants)}`}>
+            <div className={`flex-1 p-2 sm:p-4 grid gap-2 sm:gap-4 overflow-hidden ${getGridClass(totalParticipants)}`}>
                 {/* Local User */}
-                <div className="aspect-video sm:aspect-auto min-h-[200px]">
+                <div className="w-full h-full min-h-0">
                     {renderParticipantMedia(localStream, "You", true)}
                 </div>
 
@@ -156,7 +156,7 @@ export default function CallModal() {
                 {Array.from(remoteStreams.entries()).map(([socketId, stream]) => {
                     const username = peerUsernames.get(socketId) || "Unknown User";
                     return (
-                        <div key={socketId} className="aspect-video sm:aspect-auto min-h-[200px]">
+                        <div key={socketId} className="w-full h-full min-h-0">
                             {renderParticipantMedia(stream, username, false)}
                         </div>
                     );
