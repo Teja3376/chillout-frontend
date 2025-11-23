@@ -23,6 +23,7 @@ interface CallContextType {
   isVideoEnabled: boolean;
   toggleMute: () => void;
   toggleVideo: () => void;
+  toggleCamera: () => void;
   joinCall: (withVideo?: boolean) => void;
 }
 
@@ -253,20 +254,16 @@ export const CallProvider: React.FC<CallProviderProps> = ({
                   // Add this new track to all existing peer connections
                   peersRef.current.forEach((pc) => {
                       pc.addTrack(newVideoTrack, localStream);
-                      // Note: This might require renegotiation (creating new offer) depending on the browser/implementation
-                      // For simple cases, adding track might trigger negotiation needed event or we might need to manually renegotiate
-                      // Let's assume we might need to renegotiate.
-                      // Ideally we should trigger a renegotiation here.
                   });
                   
                   // Simple renegotiation trigger for all peers
-                  // This is a bit complex to do perfectly without a proper state machine, 
-                  // but let's try to just re-offer to everyone.
                   peersRef.current.forEach(async (pc, socketId) => {
                       const offer = await pc.createOffer();
                       await pc.setLocalDescription(offer);
                       socket.emit("offer", { to: socketId, offer, username });
                   });
+                  
+
 
               } catch (error) {
                   console.error("Error enabling video:", error);
@@ -274,6 +271,66 @@ export const CallProvider: React.FC<CallProviderProps> = ({
               }
           }
       }
+  };
+
+  const toggleCamera = async () => {
+    if (!localStream || !isVideoEnabled) return;
+
+    const videoTrack = localStream.getVideoTracks()[0];
+    if (!videoTrack) return;
+
+    const currentFacingMode = videoTrack.getSettings().facingMode;
+    const newFacingMode = currentFacingMode === "user" ? "environment" : "user";
+
+    try {
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: newFacingMode } }
+      });
+      const newVideoTrack = newStream.getVideoTracks()[0];
+
+      // Replace track in local stream
+      localStream.removeTrack(videoTrack);
+      localStream.addTrack(newVideoTrack);
+      
+      // Stop old track
+      videoTrack.stop();
+
+      // Replace track in all peer connections
+      peersRef.current.forEach((pc) => {
+        const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+        if (sender) {
+          sender.replaceTrack(newVideoTrack);
+        }
+      });
+
+      // Force re-render to update local video view
+      setLocalStream(new MediaStream(localStream.getTracks()));
+
+    } catch (error) {
+      console.error("Error switching camera:", error);
+      // Fallback to non-exact constraint if exact fails
+      try {
+          const newStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: newFacingMode }
+          });
+          const newVideoTrack = newStream.getVideoTracks()[0];
+          
+           // Replace track in local stream
+          localStream.removeTrack(videoTrack);
+          localStream.addTrack(newVideoTrack);
+          videoTrack.stop();
+
+          peersRef.current.forEach((pc) => {
+            const sender = pc.getSenders().find((s) => s.track?.kind === "video");
+            if (sender) {
+              sender.replaceTrack(newVideoTrack);
+            }
+          });
+          setLocalStream(new MediaStream(localStream.getTracks()));
+      } catch (fallbackError) {
+          console.error("Fallback camera switch failed:", fallbackError);
+      }
+    }
   };
 
   // Auto-rejoin if persisted state exists
@@ -297,33 +354,9 @@ export const CallProvider: React.FC<CallProviderProps> = ({
     };
 
     const handleOffer = async ({ from, offer }: { from: string; offer: RTCSessionDescriptionInit }) => {
-        // We might not know the username yet if we just joined and received an offer immediately
-        // But for now let's assume we can handle it or just display "Unknown" until we sync
-        // Ideally the offer should contain metadata or we fetch it. 
-        // For simplicity, we'll just use the socketId as a placeholder if needed, 
-        // but usually 'join_call' happens first or we need a way to map socketId to user.
-        // In this simple implementation, the 'offer' event doesn't carry username.
-        // We can fetch it or just wait.
-        // Let's modify the backend to send username with offer/answer if possible?
-        // Or just rely on the fact that we might have received 'user_joined_call' before?
-        // Actually, if *I* join, existing users send me offers. I don't know their usernames yet.
-        // Let's assume for now we just show "User" or modify backend to send username in offer.
-        // I'll modify the backend to send username in offer/answer for better UX, 
-        // BUT for now let's just use a generic name if missing or try to find it.
-        
-        // Wait, if I join, I emit 'join_call'. 
-        // Existing users receive 'join_call', create peer, send 'offer'.
-        // I receive 'offer'. I need to create peer and answer.
-        
-        // To get the username of the offerer, we can pass it in the offer payload from the sender side.
-        // I'll update the frontend logic to send username in the offer payload wrapper.
-        
         console.log("Received offer from:", from);
     };
     
-    // We need to handle the signaling logic carefully.
-    // Let's refine the socket listeners below.
-
     return () => {
       socket.off("user_joined_call");
       socket.off("offer");
@@ -399,6 +432,7 @@ export const CallProvider: React.FC<CallProviderProps> = ({
         isVideoEnabled,
         toggleMute,
         toggleVideo,
+        toggleCamera,
       }}
     >
       {children}

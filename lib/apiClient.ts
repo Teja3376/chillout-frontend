@@ -110,4 +110,22 @@ export const roomApi = {
       })
       .then((res) => res.data);
   },
+
+  /**
+   * Uploads an image file for a room.
+   * @param roomId - ID of the room.
+   * @param username - Username of the sender.
+   * @param imageFile - The image file blob.
+   * @returns Promise resolving to the upload response.
+   */
+  uploadImage: (roomId: string, username: string, imageFile: Blob) => {
+    const formData = new FormData();
+    formData.append("image", imageFile);
+    formData.append("username", username);
+    return api
+      .post(`/room/${roomId}/image`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((res) => res.data);
+  },
 };

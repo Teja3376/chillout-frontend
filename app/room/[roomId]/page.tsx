@@ -11,6 +11,7 @@ import { useGetRoom } from "@/lib/hooks";
 import { roomApi } from "@/lib/apiClient";
 import { CallProvider, useCall } from "@/components/CallProvider";
 import CallModal from "@/components/CallModal";
+import ImageModal from "@/components/ImageModal";
 
 const FlowingDots = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -138,6 +139,7 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
     duration: number;
     isLoading: boolean;
   }>({ index: null, isPlaying: false, currentTime: 0, duration: 0, isLoading: false });
+  const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -246,11 +248,39 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
       setMessages((prev) => [...prev, data]);
     });
 
+    socket.on("message_deleted", ({ messageId }: { messageId: string }) => {
+      setMessages((prev) => prev.filter((msg: any) => msg._id !== messageId));
+    });
+
+    socket.on(
+      "receive_image_message",
+      (data: {
+        username: string;
+        message: string;
+        type?: string;
+        url?: string;
+      }) => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            ...data,
+            url: data.url
+              ? data.url.startsWith("http")
+                ? data.url
+                : `${SOCKET_URL}${data.url}`
+              : undefined,
+          },
+        ]);
+      }
+    );
+
     return () => {
       socket.off("receive_message");
       socket.off("receive_voice_message");
       socket.off("call_notification");
       socket.off("call_ended_notification");
+      socket.off("message_deleted");
+      socket.off("receive_image_message");
     };
   }, [socket, roomId, username]);
 
@@ -262,6 +292,27 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
     if (newMessage.trim() === "") return;
     socket.emit("send_message", { roomId, username, message: newMessage });
     setNewMessage("");
+  };
+
+  const handleDeleteMessage = (messageId: string) => {
+    socket.emit("delete_message", { roomId, messageId });
+  };
+
+  const handleImageSelect = async (file: File) => {
+    try {
+      const response = await roomApi.uploadImage(
+        roomId as string,
+        username,
+        file
+      );
+      socket.emit("send_image_message", {
+        roomId,
+        username,
+        url: `${SOCKET_URL}${response.url}`,
+      });
+    } catch (error) {
+      console.error("Error sending image:", error);
+    }
   };
 
   const startRecording = async () => {
@@ -448,6 +499,8 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
             playingAudio={playingAudio}
             onPlayPause={playVoiceMessage}
             onJoinCall={joinCall}
+            onDelete={handleDeleteMessage}
+            onImageClick={setSelectedImage}
           />
         ))}
         <div ref={messagesEndRef} />
@@ -465,6 +518,7 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
         sendRecordedVoiceMessage={sendRecordedVoiceMessage}
         onDiscardRecording={() => setRecordedBlob(null)}
         isSendingVoice={isSendingVoice}
+        onImageSelect={handleImageSelect}
       />
 
       <OnlineUsersModal
@@ -472,6 +526,7 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
         onClose={() => setIsModalOpen(false)}
       />
       <CallModal />
+      <ImageModal imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />
     </div>
   );
 }
