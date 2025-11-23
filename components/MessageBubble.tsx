@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 import VoiceMessagePlayer from "@/components/VoiceMessagePlayer";
-import { Phone, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 export default function MessageBubble({
   msg,

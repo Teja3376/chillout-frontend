@@ -130,7 +130,6 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
-  const [isPreviewing, setIsPreviewing] = useState(false);
   const [isSendingVoice, setIsSendingVoice] = useState(false);
   const [playingAudio, setPlayingAudio] = useState<{
     index: number | null;
@@ -249,7 +248,7 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
     });
 
     socket.on("message_deleted", ({ messageId }: { messageId: string }) => {
-      setMessages((prev) => prev.filter((msg: any) => msg._id !== messageId));
+      setMessages((prev) => prev.filter((msg) => (msg as { _id?: string })._id !== messageId));
     });
 
     socket.on(
@@ -348,9 +347,7 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
     if (recordedBlob) {
       const audioUrl = URL.createObjectURL(recordedBlob);
       const audio = new Audio(audioUrl);
-      setIsPreviewing(true);
       audio.onended = () => {
-        setIsPreviewing(false);
         URL.revokeObjectURL(audioUrl);
       };
       audio.play();
@@ -406,8 +403,8 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
       audioRef.current.pause();
       try {
         audioRef.current.src = "";
-      } catch (e) {
-        console.log(e);
+      } catch {
+        console.log("Error clearing audio source");
       }
     }
 
@@ -450,7 +447,9 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
       if (audioRef.current) {
         try {
           audioRef.current.src = "";
-        } catch (e) {}
+        } catch {
+          // Ignore error
+        }
         audioRef.current = null;
       }
     };

@@ -9,7 +9,6 @@ import React, {
   useCallback,
 } from "react";
 import { useSocket } from "./SocketProvider";
-import { Socket } from "socket.io-client";
 
 interface CallContextType {
   isInCall: boolean;
