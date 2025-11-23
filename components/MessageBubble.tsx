@@ -19,6 +19,7 @@ export default function MessageBubble({
     isPlaying: boolean;
     currentTime: number;
     duration: number;
+    isLoading: boolean;
   };
   onPlayPause: (index: number, url: string) => void;
   onJoinCall?: () => void;
