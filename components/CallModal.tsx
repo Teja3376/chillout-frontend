@@ -168,23 +168,31 @@ export default function CallModal() {
                 <Button
                     variant={isMuted ? "destructive" : "secondary"}
                     size="icon"
-                    className={`rounded-full w-14 h-14 shadow-lg transition-all ${
+                    className={`rounded-full w-14 h-14 shadow-lg transition-all touch-manipulation ${
                         isMuted 
-                        ? "bg-red-500/20 text-red-500 hover:bg-red-500/30 border border-red-500/50" 
-                        : "bg-white/10 text-white hover:bg-white/20 border border-white/10"
+                        ? "bg-red-500/20 text-red-500 hover:bg-red-500/30 active:bg-red-500/40 border border-red-500/50" 
+                        : "bg-white/10 text-white hover:bg-white/20 active:bg-white/30 border border-white/10"
                     }`}
                     onClick={toggleMute}
+                    onTouchEnd={(e) => {
+                        e.preventDefault();
+                        toggleMute();
+                    }}
                 >
                     {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
                 </Button>
 
                 <Button
                     onClick={toggleVideo}
+                    onTouchEnd={(e) => {
+                        e.preventDefault();
+                        toggleVideo();
+                    }}
                     variant={isVideoEnabled ? "default" : "destructive"}
-                    className={`rounded-full w-14 h-14 shadow-lg transition-all ${
+                    className={`rounded-full w-14 h-14 shadow-lg transition-all touch-manipulation ${
                         isVideoEnabled 
-                        ? "bg-primary hover:bg-primary/90" 
-                        : "bg-red-500 hover:bg-red-600"
+                        ? "bg-primary hover:bg-primary/90 active:bg-primary/80" 
+                        : "bg-red-500 hover:bg-red-600 active:bg-red-700"
                     }`}
                 >
                     {isVideoEnabled ? <Video className="w-6 h-6" /> : <VideoOff className="w-6 h-6" />}
@@ -193,8 +201,12 @@ export default function CallModal() {
                 {/* Switch Camera Button (Mobile Only) */}
                 <Button
                     onClick={toggleCamera}
+                    onTouchEnd={(e) => {
+                        e.preventDefault();
+                        toggleCamera();
+                    }}
                     variant="secondary"
-                    className="rounded-full w-14 h-14 flex md:hidden items-center justify-center transition-all duration-300 bg-secondary/80 hover:bg-secondary"
+                    className="rounded-full w-14 h-14 flex md:hidden items-center justify-center transition-all duration-300 bg-secondary/80 hover:bg-secondary active:bg-secondary/70 touch-manipulation"
                 >
                     <RefreshCw className="w-6 h-6" />
                 </Button>
@@ -202,8 +214,12 @@ export default function CallModal() {
                 <Button
                     variant="destructive"
                     size="icon"
-                    className="rounded-full w-16 h-16 shadow-2xl bg-red-600 hover:bg-red-700 text-white border-4 border-red-500/30"
+                    className="rounded-full w-16 h-16 shadow-2xl bg-red-600 hover:bg-red-700 active:bg-red-800 text-white border-4 border-red-500/30 touch-manipulation"
                     onClick={leaveCall}
+                    onTouchEnd={(e) => {
+                        e.preventDefault();
+                        leaveCall();
+                    }}
                 >
                     <PhoneOff className="w-8 h-8" />
                 </Button>
