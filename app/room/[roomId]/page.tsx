@@ -139,6 +139,8 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
     isLoading: boolean;
   }>({ index: null, isPlaying: false, currentTime: 0, duration: 0, isLoading: false });
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
+  const [selectedImageFile, setSelectedImageFile] = React.useState<File | null>(null);
+  const [isSendingImage, setIsSendingImage] = React.useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -298,19 +300,29 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
   };
 
   const handleImageSelect = async (file: File) => {
+    setSelectedImageFile(file);
+  };
+
+  const sendSelectedImage = async () => {
+    if (!selectedImageFile || isSendingImage) return;
+
+    setIsSendingImage(true);
     try {
       const response = await roomApi.uploadImage(
         roomId as string,
         username,
-        file
+        selectedImageFile
       );
       socket.emit("send_image_message", {
         roomId,
         username,
         url: `${SOCKET_URL}${response.url}`,
       });
+      setSelectedImageFile(null);
     } catch (error) {
       console.error("Error sending image:", error);
+    } finally {
+      setIsSendingImage(false);
     }
   };
 
@@ -518,6 +530,10 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
         onDiscardRecording={() => setRecordedBlob(null)}
         isSendingVoice={isSendingVoice}
         onImageSelect={handleImageSelect}
+        selectedImageFile={selectedImageFile}
+        isSendingImage={isSendingImage}
+        onDiscardImage={() => setSelectedImageFile(null)}
+        sendSelectedImage={sendSelectedImage}
       />
 
       <OnlineUsersModal

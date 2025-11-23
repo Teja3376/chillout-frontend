@@ -4,8 +4,8 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { io, Socket } from "socket.io-client";
 
 // 👇 Replace with your backend URL
-// export const SOCKET_URL = "https://chillout-backend-v2.onrender.com";
-export const SOCKET_URL = "http://localhost:5000";
+export const SOCKET_URL = "https://chillout-backend-v2.onrender.com";
+// export const SOCKET_URL = "http://localhost:5000";
 
 const SocketContext = createContext<Socket | null>(null);
 const OnlineUsersContext = createContext<string[]>([]);

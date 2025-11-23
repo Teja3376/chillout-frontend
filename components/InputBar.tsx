@@ -18,6 +18,10 @@ export default function InputBar({
   onDiscardRecording,
   isSendingVoice,
   onImageSelect,
+  selectedImageFile,
+  isSendingImage,
+  onDiscardImage,
+  sendSelectedImage,
 }: {
   newMessage: string;
   setNewMessage: (v: string) => void;
@@ -31,6 +35,10 @@ export default function InputBar({
   onDiscardRecording: () => void;
   isSendingVoice: boolean;
   onImageSelect: (file: File) => void;
+  selectedImageFile: File | null;
+  isSendingImage: boolean;
+  onDiscardImage: () => void;
+  sendSelectedImage: () => void;
 }) {
   const [isPlayingPreview, setIsPlayingPreview] = React.useState(false);
   const [previewProgress, setPreviewProgress] = React.useState(0);
@@ -151,6 +159,43 @@ export default function InputBar({
             className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-[0_0_15px_rgba(var(--primary),0.4)] transition-all hover:scale-105 px-6 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
           >
             <SendIcon className="w-5 h-5" />
+          </Button>
+        </div>
+      ) : selectedImageFile ? (
+        <div className="flex-1 flex items-center gap-3 bg-card/50 border border-primary/30 rounded-2xl p-2 px-4 animate-in fade-in slide-in-from-bottom-4">
+          <Button
+            onClick={onDiscardImage}
+            variant="ghost"
+            className="h-10 w-10 rounded-full text-destructive hover:text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            <Trash2Icon className="w-5 h-5" />
+          </Button>
+
+          <div className="flex-1 flex items-center gap-3">
+            <img
+              src={URL.createObjectURL(selectedImageFile)}
+              alt="Preview"
+              className="h-16 w-16 rounded-lg object-cover border border-primary/20"
+            />
+            <div className="flex flex-col justify-center">
+              <span className="text-sm font-medium text-foreground">Image Preview</span>
+              <span className="text-xs text-muted-foreground">{selectedImageFile.name}</span>
+            </div>
+          </div>
+
+          <Button
+            onClick={sendSelectedImage}
+            disabled={isSendingImage}
+            className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-[0_0_15px_rgba(var(--primary),0.4)] transition-all hover:scale-105 px-6 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+          >
+            {isSendingImage ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span className="text-sm">Sending...</span>
+              </div>
+            ) : (
+              <SendIcon className="w-5 h-5" />
+            )}
           </Button>
         </div>
       ) : (
