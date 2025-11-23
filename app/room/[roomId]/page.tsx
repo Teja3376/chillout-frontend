@@ -1,17 +1,19 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useSearchParams, useParams } from "next/navigation";
-import { useSocket, useOnlineUsers, SOCKET_URL } from "@/components/SocketProvider";
+import { useOnlineUsers } from "@/components/SocketProvider";
 import HeaderBar from "@/components/HeaderBar";
 import MessageBubble from "@/components/MessageBubble";
 import InputBar from "@/components/InputBar";
 import OnlineUsersModal from "@/components/OnlineUsersModal";
-import { useGetRoom } from "@/lib/hooks";
-import { roomApi } from "@/lib/apiClient";
-import { CallProvider, useCall } from "@/components/CallProvider";
+import { useCall, CallProvider } from "@/components/CallProvider";
 import CallModal from "@/components/CallModal";
 import ImageModal from "@/components/ImageModal";
+import { useRoomData } from "@/hooks/useRoomData";
+import { useSocketMessages } from "@/hooks/useSocketMessages";
+import { useVoicePlayer } from "@/hooks/useVoicePlayer";
+import { useImageUpload } from "@/hooks/useImageUpload";
 
 const FlowingDots = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -48,32 +50,35 @@ const FlowingDots = () => {
       ctx.clearRect(0, 0, width, height);
 
       ctx.fillStyle = "rgba(99, 102, 241, 0.8)";
-      ctx.strokeStyle = "rgba(99, 102, 241, 0.15)";
+      dots.forEach((dot) => {
+        ctx.beginPath();
+        ctx.arc(dot.x, dot.y, dot.size, 0, Math.PI * 2);
+        ctx.fill();
+      });
 
-      dots.forEach((dot, i) => {
+      ctx.strokeStyle = "rgba(99, 102, 241, 0.15)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < dots.length; i++) {
+        for (let j = i + 1; j < dots.length; j++) {
+          const dx = dots[i].x - dots[j].x;
+          const dy = dots[i].y - dots[j].y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+
+          if (distance < CONNECTION_DISTANCE) {
+            ctx.beginPath();
+            ctx.moveTo(dots[i].x, dots[i].y);
+            ctx.lineTo(dots[j].x, dots[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      dots.forEach((dot) => {
         dot.x += dot.vx;
         dot.y += dot.vy;
 
         if (dot.x < 0 || dot.x > width) dot.vx *= -1;
         if (dot.y < 0 || dot.y > height) dot.vy *= -1;
-
-        ctx.beginPath();
-        ctx.arc(dot.x, dot.y, dot.size, 0, Math.PI * 2);
-        ctx.fill();
-
-        for (let j = i + 1; j < dots.length; j++) {
-          const other = dots[j];
-          const dx = dot.x - other.x;
-          const dy = dot.y - other.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-
-          if (distance < CONNECTION_DISTANCE) {
-            ctx.beginPath();
-            ctx.moveTo(dot.x, dot.y);
-            ctx.lineTo(other.x, other.y);
-            ctx.stroke();
-          }
-        }
       });
 
       animationFrameId = requestAnimationFrame(render);
@@ -99,394 +104,76 @@ const FlowingDots = () => {
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 z-0 pointer-events-none opacity-60"
+      className="fixed inset-0 z-0 pointer-events-none"
+      style={{ opacity: 0.4 }}
     />
   );
 };
 
-export default function RoomPage() {
-  const { roomId } = useParams() as { roomId: string };
+function RoomPageContent() {
   const searchParams = useSearchParams();
-  const username = searchParams.get("username") || "anonymous";
+  const params = useParams();
+  const roomId = params?.roomId as string;
+  const username = searchParams?.get("username") || "Anonymous";
 
-  return (
-    <CallProvider roomId={roomId} username={username}>
-      <RoomContent roomId={roomId} username={username} />
-    </CallProvider>
-  );
-}
-
-function RoomContent({ roomId, username }: { roomId: string; username: string }) {
-  const socket = useSocket();
   const onlineUsers = useOnlineUsers({ roomId });
-  const { data: roomData } = useGetRoom(roomId);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newMessage, setNewMessage] = useState("");
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
   const { joinCall } = useCall();
 
-  const [messages, setMessages] = useState<
-    { username: string; message: string; type?: string; url?: string; callInitiator?: string }[]
-  >([]);
-  const [newMessage, setNewMessage] = useState<string>("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
-  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
-  const [isSendingVoice, setIsSendingVoice] = useState(false);
-  const [playingAudio, setPlayingAudio] = useState<{
-    index: number | null;
-    isPlaying: boolean;
-    currentTime: number;
-    duration: number;
-    isLoading: boolean;
-  }>({ index: null, isPlaying: false, currentTime: 0, duration: 0, isLoading: false });
-  const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
-  const [selectedImageFile, setSelectedImageFile] = React.useState<File | null>(null);
-  const [isSendingImage, setIsSendingImage] = React.useState(false);
+  // Custom hooks - replaces all the complex logic!
+  const { data: roomData, isLoading, error } = useRoomData(roomId);
+  const { messages, setMessages, sendMessage: socketSendMessage, deleteMessage } = useSocketMessages(roomId, username);
+  const voicePlayer = useVoicePlayer(roomId, username);
+  const imageUpload = useImageUpload(roomId, username);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
+  // Initialize messages from room data
   useEffect(() => {
     if (roomData) {
-      setMessages(
-        roomData.messages.map(
-          (msg: {
-            username: string;
-            message: string;
-            type?: string;
-            url?: string;
-          }) => ({
-            ...msg,
-            url: msg.url
-              ? msg.url.startsWith("http")
-                ? msg.url
-                : `${SOCKET_URL}${msg.url}`
-              : undefined,
-          })
-        )
-      );
+      setMessages(roomData.messages || []);
     }
-  }, [roomData]);
+  }, [roomData, setMessages]);
 
-  useEffect(() => {
-    socket.emit("join_room", { roomId, username });
-
-    socket.on(
-      "receive_message",
-      (data: {
-        username: string;
-        message: string;
-        type?: string;
-        url?: string;
-      }) => {
-        setMessages((prev) => [...prev, data]);
-        setTimeout(() => {
-          const lastMessage = document.querySelector(
-            ".message-bubble:last-child"
-          ) as HTMLElement;
-          if (lastMessage) {
-            lastMessage.style.transform = "scale(0.8)";
-            lastMessage.style.opacity = "0";
-            setTimeout(() => {
-              lastMessage.style.transition = "all 0.5s ease-out";
-              lastMessage.style.transform = "scale(1)";
-              lastMessage.style.opacity = "1";
-            }, 50);
-          }
-        }, 100);
-      }
-    );
-
-    socket.on(
-      "receive_voice_message",
-      (data: {
-        username: string;
-        message: string;
-        type?: string;
-        url?: string;
-      }) => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            ...data,
-            url: data.url
-              ? data.url.startsWith("http")
-                ? data.url
-                : `${SOCKET_URL}${data.url}`
-              : undefined,
-          },
-        ]);
-        setTimeout(() => {
-          const lastMessage = document.querySelector(
-            ".message-bubble:last-child"
-          ) as HTMLElement;
-          if (lastMessage) {
-            lastMessage.style.transform = "scale(0.8)";
-            lastMessage.style.opacity = "0";
-            setTimeout(() => {
-              lastMessage.style.transition = "all 0.5s ease-out";
-              lastMessage.style.transform = "scale(1)";
-              lastMessage.style.opacity = "1";
-            }, 50);
-          }
-        }, 100);
-      }
-    );
-
-    socket.on("call_notification", (data: {
-      username: string;
-      message: string;
-      type: string;
-      callInitiator: string;
-    }) => {
-      setMessages((prev) => [...prev, data]);
-    });
-
-    socket.on("call_ended_notification", (data: {
-      username: string;
-      message: string;
-      type: string;
-    }) => {
-      setMessages((prev) => [...prev, data]);
-    });
-
-    socket.on("message_deleted", ({ messageId }: { messageId: string }) => {
-      setMessages((prev) => prev.filter((msg) => (msg as { _id?: string })._id !== messageId));
-    });
-
-    socket.on(
-      "receive_image_message",
-      (data: {
-        username: string;
-        message: string;
-        type?: string;
-        url?: string;
-      }) => {
-        setMessages((prev) => [
-          ...prev,
-          {
-            ...data,
-            url: data.url
-              ? data.url.startsWith("http")
-                ? data.url
-                : `${SOCKET_URL}${data.url}`
-              : undefined,
-          },
-        ]);
-      }
-    );
-
-    return () => {
-      socket.off("receive_message");
-      socket.off("receive_voice_message");
-      socket.off("call_notification");
-      socket.off("call_ended_notification");
-      socket.off("message_deleted");
-      socket.off("receive_image_message");
-    };
-  }, [socket, roomId, username]);
-
+  // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const sendMessage = () => {
     if (newMessage.trim() === "") return;
-    socket.emit("send_message", { roomId, username, message: newMessage });
+    socketSendMessage(newMessage);
     setNewMessage("");
   };
 
-  const handleDeleteMessage = (messageId: string) => {
-    socket.emit("delete_message", { roomId, messageId });
-  };
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading room...</p>
+        </div>
+      </div>
+    );
+  }
 
-  const handleImageSelect = async (file: File) => {
-    setSelectedImageFile(file);
-  };
-
-  const sendSelectedImage = async () => {
-    if (!selectedImageFile || isSendingImage) return;
-
-    setIsSendingImage(true);
-    try {
-      const response = await roomApi.uploadImage(
-        roomId as string,
-        username,
-        selectedImageFile
-      );
-      socket.emit("send_image_message", {
-        roomId,
-        username,
-        url: `${SOCKET_URL}${response.url}`,
-      });
-      setSelectedImageFile(null);
-    } catch (error) {
-      console.error("Error sending image:", error);
-    } finally {
-      setIsSendingImage(false);
-    }
-  };
-
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      setMediaRecorder(recorder);
-      setIsRecording(true);
-
-      const chunks: Blob[] = [];
-      recorder.ondataavailable = (e: BlobEvent) => chunks.push(e.data);
-      recorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: "audio/webm" });
-        setRecordedBlob(blob);
-        stream.getTracks().forEach((track) => track.stop());
-      };
-
-      recorder.start();
-    } catch (error) {
-      console.error("Error starting recording:", error);
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorder) {
-      mediaRecorder.stop();
-      setIsRecording(false);
-      setMediaRecorder(null);
-    }
-  };
-
-  const previewVoiceMessage = () => {
-    if (recordedBlob) {
-      const audioUrl = URL.createObjectURL(recordedBlob);
-      const audio = new Audio(audioUrl);
-      audio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
-      };
-      audio.play();
-    }
-  };
-
-  const sendRecordedVoiceMessage = async () => {
-    if (recordedBlob && !isSendingVoice) {
-      setIsSendingVoice(true);
-      try {
-        await sendVoiceMessage(recordedBlob);
-        setRecordedBlob(null);
-      } catch (error) {
-        console.error("Error sending recorded voice message:", error);
-      } finally {
-        setIsSendingVoice(false);
-      }
-    }
-  };
-
-  const sendVoiceMessage = async (voiceBlob: Blob) => {
-    try {
-      const response = await roomApi.uploadVoice(
-        roomId as string,
-        username,
-        voiceBlob
-      );
-      socket.emit("send_voice_message", {
-        roomId,
-        username,
-        url: `${SOCKET_URL}${response.url}`,
-      });
-    } catch (error) {
-      console.error("Error sending voice message:", error);
-    }
-  };
-
-  const playVoiceMessage = (index: number, url: string) => {
-    if (playingAudio.index === index) {
-      if (audioRef.current) {
-        if (playingAudio.isPlaying) {
-          audioRef.current.pause();
-          setPlayingAudio((p) => ({ ...p, isPlaying: false }));
-        } else {
-          audioRef.current.play();
-          setPlayingAudio((p) => ({ ...p, isPlaying: true }));
-        }
-      }
-      return;
-    }
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-      try {
-        audioRef.current.src = "";
-      } catch {
-        console.log("Error clearing audio source");
-      }
-    }
-
-    // Set loading state immediately
-    setPlayingAudio({
-      index,
-      isPlaying: false,
-      currentTime: 0,
-      duration: 0,
-      isLoading: true,
-    });
-
-    const audio = new Audio(url);
-    audioRef.current = audio;
-
-    audio.onloadedmetadata = () => {
-      setPlayingAudio({
-        index,
-        isPlaying: true,
-        currentTime: 0,
-        duration: audio.duration || 0,
-        isLoading: false,
-      });
-    };
-    audio.ontimeupdate = () => {
-      setPlayingAudio((prev) =>
-        prev.index === index
-          ? { ...prev, currentTime: audio.currentTime }
-          : prev
-      );
-    };
-    audio.onended = () => {
-      setPlayingAudio({
-        index: null,
-        isPlaying: false,
-        currentTime: 0,
-        duration: 0,
-        isLoading: false,
-      });
-      if (audioRef.current) {
-        try {
-          audioRef.current.src = "";
-        } catch {
-          // Ignore error
-        }
-        audioRef.current = null;
-      }
-    };
-    audio.onerror = () => {
-      console.error("Audio playback error for", url);
-      setPlayingAudio({
-        index: null,
-        isPlaying: false,
-        currentTime: 0,
-        duration: 0,
-        isLoading: false,
-      });
-    };
-
-    audio.play().catch((err) => {
-      console.error("Play prevented:", err);
-      setPlayingAudio({
-        index: null,
-        isPlaying: false,
-        currentTime: 0,
-        duration: 0,
-        isLoading: false,
-      });
-    });
-  };
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <p className="text-destructive mb-4">Error loading room</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background relative overflow-hidden selection:bg-primary/20">
@@ -507,10 +194,10 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
             msg={msg}
             idx={idx}
             currentUser={username}
-            playingAudio={playingAudio}
-            onPlayPause={playVoiceMessage}
+            playingAudio={voicePlayer.playingAudio}
+            onPlayPause={voicePlayer.playVoiceMessage}
             onJoinCall={joinCall}
-            onDelete={handleDeleteMessage}
+            onDelete={deleteMessage}
             onImageClick={setSelectedImage}
           />
         ))}
@@ -521,19 +208,19 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
         newMessage={newMessage}
         setNewMessage={setNewMessage}
         sendMessage={sendMessage}
-        isRecording={isRecording}
-        startRecording={startRecording}
-        stopRecording={stopRecording}
-        recordedBlob={recordedBlob}
-        previewVoiceMessage={previewVoiceMessage}
-        sendRecordedVoiceMessage={sendRecordedVoiceMessage}
-        onDiscardRecording={() => setRecordedBlob(null)}
-        isSendingVoice={isSendingVoice}
-        onImageSelect={handleImageSelect}
-        selectedImageFile={selectedImageFile}
-        isSendingImage={isSendingImage}
-        onDiscardImage={() => setSelectedImageFile(null)}
-        sendSelectedImage={sendSelectedImage}
+        isRecording={voicePlayer.isRecording}
+        startRecording={voicePlayer.startRecording}
+        stopRecording={voicePlayer.stopRecording}
+        recordedBlob={voicePlayer.recordedBlob}
+        previewVoiceMessage={voicePlayer.previewVoiceMessage}
+        sendRecordedVoiceMessage={voicePlayer.sendRecordedVoiceMessage}
+        onDiscardRecording={voicePlayer.discardRecording}
+        isSendingVoice={voicePlayer.isSendingVoice}
+        onImageSelect={imageUpload.handleImageSelect}
+        selectedImageFile={imageUpload.selectedImageFile}
+        isSendingImage={imageUpload.isSendingImage}
+        onDiscardImage={imageUpload.discardImage}
+        sendSelectedImage={imageUpload.sendSelectedImage}
       />
 
       <OnlineUsersModal
@@ -543,5 +230,18 @@ function RoomContent({ roomId, username }: { roomId: string; username: string })
       <CallModal />
       <ImageModal imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />
     </div>
+  );
+}
+
+export default function RoomPage() {
+  const searchParams = useSearchParams();
+  const params = useParams();
+  const roomId = params?.roomId as string;
+  const username = searchParams?.get("username") || "Anonymous";
+
+  return (
+    <CallProvider roomId={roomId} username={username}>
+      <RoomPageContent />
+    </CallProvider>
   );
 }
