@@ -1,8 +1,14 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { UsersIcon } from "lucide-react";
+import { UsersIcon, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useTheme } from "next-themes";
 
@@ -46,16 +52,38 @@ export default function HeaderBar({
         </div>
       </div>
       <div className="flex items-center space-x-2 sm:space-x-3">
-        <Button
-          onClick={isInCall ? leaveCall : joinCall}
-          variant={isInCall ? "destructive" : "default"}
-          className={`rounded-full px-4 h-10 transition-all duration-300 hover:scale-105 flex items-center space-x-2 ${
-            isInCall ? "bg-red-600 hover:bg-red-700" : "bg-primary hover:bg-primary/90"
-          }`}
-        >
-          {isInCall ? <PhoneOff className="w-4 h-4" /> : <Phone className="w-4 h-4" />}
-          <span className="text-sm font-bold hidden sm:inline">{isInCall ? "Leave" : "Voice Chat"}</span>
-        </Button>
+        {isInCall ? (
+          <Button
+            onClick={leaveCall}
+            variant="destructive"
+            className="rounded-full px-4 h-10 transition-all duration-300 hover:scale-105 flex items-center space-x-2 bg-red-600 hover:bg-red-700"
+          >
+            <PhoneOff className="w-4 h-4" />
+            <span className="text-sm font-bold hidden sm:inline">Leave</span>
+          </Button>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="default"
+                className="bg-primary hover:bg-primary/90 rounded-full px-4 h-10 transition-all duration-300 hover:scale-105 flex items-center space-x-2"
+              >
+                <Phone className="w-4 h-4" />
+                <span className="text-sm font-bold hidden sm:inline">Call</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 bg-background/95 backdrop-blur-md border-primary/20">
+              <DropdownMenuItem onClick={() => joinCall(false)} className="cursor-pointer focus:bg-primary/10 focus:text-primary">
+                <Phone className="w-4 h-4 mr-2" />
+                <span>Audio Call</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => joinCall(true)} className="cursor-pointer focus:bg-primary/10 focus:text-primary">
+                <Video className="w-4 h-4 mr-2" />
+                <span>Video Call</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         <Button
           onClick={onOpenModal}

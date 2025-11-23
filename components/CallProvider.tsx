@@ -13,12 +13,17 @@ import { Socket } from "socket.io-client";
 
 interface CallContextType {
   isInCall: boolean;
-  joinCall: () => void;
+
   leaveCall: () => void;
   participants: string[]; // List of usernames
   localStream: MediaStream | null;
+  remoteStreams: Map<string, MediaStream>;
+  peerUsernames: Map<string, string>; // Map socketId -> username
   isMuted: boolean;
+  isVideoEnabled: boolean;
   toggleMute: () => void;
+  toggleVideo: () => void;
+  joinCall: (withVideo?: boolean) => void;
 }
 
 const CallContext = createContext<CallContextType | null>(null);
@@ -54,9 +59,11 @@ export const CallProvider: React.FC<CallProviderProps> = ({
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [participants, setParticipants] = useState<string[]>([]);
   const [isMuted, setIsMuted] = useState(false);
+  const [isVideoEnabled, setIsVideoEnabled] = useState(false);
+  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
+  const [peerUsernames, setPeerUsernames] = useState<Map<string, string>>(new Map());
 
   const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map());
-  const remoteStreamsRef = useRef<Map<string, MediaStream>>(new Map());
   // To keep track of usernames associated with socketIds
   const peerUsernamesRef = useRef<Map<string, string>>(new Map());
 
@@ -76,7 +83,12 @@ export const CallProvider: React.FC<CallProviderProps> = ({
     (socketId: string, stream: MediaStream, remoteUsername: string) => {
       const pc = new RTCPeerConnection(ICE_SERVERS);
       peersRef.current.set(socketId, pc);
-      peerUsernamesRef.current.set(socketId, remoteUsername);
+      // peerUsernamesRef.current.set(socketId, remoteUsername);
+      setPeerUsernames((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(socketId, remoteUsername);
+          return newMap;
+      });
       addParticipant(remoteUsername);
 
       // Add local tracks to the connection
@@ -97,14 +109,23 @@ export const CallProvider: React.FC<CallProviderProps> = ({
       // Handle remote stream
       pc.ontrack = (event) => {
         const remoteStream = event.streams[0];
-        remoteStreamsRef.current.set(socketId, remoteStream);
         
-        // Create a new audio element for this peer
-        const audio = document.createElement("audio");
+        setRemoteStreams((prev) => {
+            const newMap = new Map(prev);
+            newMap.set(socketId, remoteStream);
+            return newMap;
+        });
+
+        // Create a new audio element for this peer if it doesn't exist (for audio playback)
+        // Video elements will be handled in the UI component
+        let audio = document.getElementById(`audio-${socketId}`) as HTMLAudioElement;
+        if (!audio) {
+            audio = document.createElement("audio");
+            audio.id = `audio-${socketId}`;
+            document.body.appendChild(audio);
+        }
         audio.srcObject = remoteStream;
         audio.autoplay = true;
-        audio.id = `audio-${socketId}`;
-        document.body.appendChild(audio);
       };
 
       pc.onconnectionstatechange = () => {
@@ -125,25 +146,43 @@ export const CallProvider: React.FC<CallProviderProps> = ({
       peersRef.current.delete(socketId);
     }
     
-    const username = peerUsernamesRef.current.get(socketId);
-    if (username) {
-      removeParticipant(username);
-      peerUsernamesRef.current.delete(socketId);
-    }
+    // const username = peerUsernamesRef.current.get(socketId);
+    // if (username) {
+    //   removeParticipant(username);
+    //   peerUsernamesRef.current.delete(socketId);
+    // }
+    
+    setPeerUsernames((prev) => {
+        const username = prev.get(socketId);
+        if (username) {
+            removeParticipant(username);
+        }
+        const newMap = new Map(prev);
+        newMap.delete(socketId);
+        return newMap;
+    });
 
     const audioEl = document.getElementById(`audio-${socketId}`);
     if (audioEl) {
       audioEl.remove();
     }
     
-    remoteStreamsRef.current.delete(socketId);
+    setRemoteStreams((prev) => {
+        const newMap = new Map(prev);
+        newMap.delete(socketId);
+        return newMap;
+    });
   }, [removeParticipant]);
 
-  const joinCall = useCallback(async () => {
+  const joinCall = useCallback(async (withVideo: boolean = false) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+          audio: true, 
+          video: withVideo ? { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } : false 
+      });
       setLocalStream(stream);
       setIsInCall(true);
+      setIsVideoEnabled(withVideo);
       addParticipant(username); // Add self
 
       socket.emit("join_call", { roomId, username });
@@ -151,8 +190,8 @@ export const CallProvider: React.FC<CallProviderProps> = ({
       // Persist call state
       sessionStorage.setItem('inCall_roomId', roomId);
     } catch (error) {
-      console.error("Error accessing microphone:", error);
-      alert("Could not access microphone. Please allow permissions.");
+      console.error("Error accessing media devices:", error);
+      alert("Could not access microphone/camera. Please allow permissions.");
     }
   }, [roomId, username, socket, addParticipant]);
 
@@ -172,8 +211,10 @@ export const CallProvider: React.FC<CallProviderProps> = ({
         cleanupPeer(socketId);
     });
     peersRef.current.clear();
-    peerUsernamesRef.current.clear();
-    remoteStreamsRef.current.clear();
+    peersRef.current.clear();
+    // peerUsernamesRef.current.clear();
+    setPeerUsernames(new Map());
+    setRemoteStreams(new Map());
 
     // Clear persisted call state
     sessionStorage.removeItem('inCall_roomId');
@@ -188,6 +229,51 @@ export const CallProvider: React.FC<CallProviderProps> = ({
         setIsMuted(!audioTrack.enabled);
       }
     }
+  };
+
+  const toggleVideo = async () => {
+      if (localStream) {
+          const videoTrack = localStream.getVideoTracks()[0];
+          
+          if (videoTrack) {
+              // If we already have a video track, just toggle it
+              videoTrack.enabled = !videoTrack.enabled;
+              setIsVideoEnabled(videoTrack.enabled);
+          } else {
+              // If we don't have a video track (started as audio-only), we need to get one
+              try {
+                  const videoStream = await navigator.mediaDevices.getUserMedia({ 
+                      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" } 
+                  });
+                  const newVideoTrack = videoStream.getVideoTracks()[0];
+                  
+                  localStream.addTrack(newVideoTrack);
+                  setIsVideoEnabled(true);
+
+                  // Add this new track to all existing peer connections
+                  peersRef.current.forEach((pc) => {
+                      pc.addTrack(newVideoTrack, localStream);
+                      // Note: This might require renegotiation (creating new offer) depending on the browser/implementation
+                      // For simple cases, adding track might trigger negotiation needed event or we might need to manually renegotiate
+                      // Let's assume we might need to renegotiate.
+                      // Ideally we should trigger a renegotiation here.
+                  });
+                  
+                  // Simple renegotiation trigger for all peers
+                  // This is a bit complex to do perfectly without a proper state machine, 
+                  // but let's try to just re-offer to everyone.
+                  peersRef.current.forEach(async (pc, socketId) => {
+                      const offer = await pc.createOffer();
+                      await pc.setLocalDescription(offer);
+                      socket.emit("offer", { to: socketId, offer, username });
+                  });
+
+              } catch (error) {
+                  console.error("Error enabling video:", error);
+                  alert("Could not access camera.");
+              }
+          }
+      }
   };
 
   // Auto-rejoin if persisted state exists
@@ -307,8 +393,12 @@ export const CallProvider: React.FC<CallProviderProps> = ({
         leaveCall,
         participants,
         localStream,
+        remoteStreams,
+        peerUsernames,
         isMuted,
+        isVideoEnabled,
         toggleMute,
+        toggleVideo,
       }}
     >
       {children}
