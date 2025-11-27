@@ -34,7 +34,13 @@ const FlowingDots = () => {
     canvas.width = width;
     canvas.height = height;
 
-    const dots: { x: number; y: number; vx: number; vy: number; size: number }[] = [];
+    const dots: {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      size: number;
+    }[] = [];
     const DOT_COUNT = 100;
     const CONNECTION_DISTANCE = 150;
 
@@ -50,7 +56,7 @@ const FlowingDots = () => {
 
     const render = () => {
       ctx.clearRect(0, 0, width, height);
-      
+
       // Update and draw dots
       ctx.fillStyle = "rgba(99, 102, 241, 0.8)"; // Indigo
       ctx.strokeStyle = "rgba(99, 102, 241, 0.15)";
@@ -122,9 +128,10 @@ export default function HomePage() {
   // Wait for theme to be mounted to avoid hydration mismatch
   useEffect(() => {
     setMounted(true);
-    
+
     // Call health check to wake up backend
-    roomApi.healthCheck()
+    roomApi
+      .healthCheck()
       .then((data) => console.log("Backend health check:", data))
       .catch((err) => console.error("Backend health check failed:", err));
   }, []);
@@ -140,7 +147,11 @@ export default function HomePage() {
   };
 
   // Determine which logo to show based on theme
-  const logoSrc = !mounted ? "/Chillout-dark.png" : theme === "light" ? "/Chillout-light.png" : "/Chillout-dark.png";
+  const logoSrc = !mounted
+    ? "/icon-192x192.png"
+    : theme === "light"
+    ? "/icon-512x512.png"
+    : "/icon-192x192.png";
 
   return (
     <div className="w-full h-full flex items-center justify-center min-h-screen bg-background p-4 sm:p-6 relative overflow-hidden selection:bg-primary/20">
@@ -154,10 +165,16 @@ export default function HomePage() {
 
       <Card className="w-full max-w-md mx-auto bg-card/30 backdrop-blur-xl border-white/10 shadow-2xl rounded-3xl relative z-10 sm:animate-float-slow overflow-hidden ring-1 ring-white/5">
         <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none"></div>
-        
+
         <CardHeader className="text-center relative z-10 pt-10">
           <div className="mx-auto mb-6 relative w-32 h-32 flex items-center justify-center">
-             <Image src={logoSrc} alt="Chillout" width={120} height={120} className="drop-shadow-2xl rounded-md" />
+            <Image
+              src={logoSrc}
+              alt="Chillout"
+              width={120}
+              height={120}
+              className="drop-shadow-2xl rounded-md"
+            />
           </div>
           <CardTitle className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary via-indigo-400 to-primary">
             Chillout
@@ -169,7 +186,9 @@ export default function HomePage() {
 
         <CardContent className="space-y-6 relative z-10 px-8">
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Display Name</label>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">
+              Display Name
+            </label>
             <Input
               placeholder="Enter your username"
               value={username}
@@ -179,7 +198,9 @@ export default function HomePage() {
           </div>
 
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Room ID</label>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">
+              Room ID
+            </label>
             <Input
               placeholder="Enter Room ID"
               value={roomId}

@@ -34,13 +34,23 @@ export default function HeaderBar({
     setMounted(true);
   }, []);
 
-  const logoSrc = !mounted ? "/Chillout-dark.png" : theme === "light" ? "/Chillout-light.png" : "/Chillout-dark.png";
+  const logoSrc = !mounted
+    ? "/icon-192x192.png"
+    : theme === "light"
+    ? "/icon-512x512.png"
+    : "/icon-192x192.png";
 
   return (
     <header className="fixed top-0 left-0 right-0 p-2 sm:p-4 bg-background/80 backdrop-blur-xl border-b border-border/50 z-20 flex justify-between items-center shadow-sm">
       <div className="flex items-center space-x-3">
         <div className="w-10 h-10 rounded-xs bg-primary/10 flex items-center justify-center border border-primary/20">
-          <Image src={logoSrc} alt="Chillout" width={32} height={32} className="rounded-xs" />
+          <Image
+            src={logoSrc}
+            alt="Chillout"
+            width={32}
+            height={32}
+            className="rounded-xs"
+          />
         </div>
         <div className="flex flex-col">
           <h2 className="text-sm font-bold text-foreground tracking-tight">
@@ -72,12 +82,21 @@ export default function HeaderBar({
                 <span className="text-sm font-bold hidden sm:inline">Call</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 bg-background/95 backdrop-blur-md border-primary/20">
-              <DropdownMenuItem onClick={() => joinCall(false)} className="cursor-pointer focus:bg-primary/10 focus:text-primary">
+            <DropdownMenuContent
+              align="end"
+              className="w-48 bg-background/95 backdrop-blur-md border-primary/20"
+            >
+              <DropdownMenuItem
+                onClick={() => joinCall(false)}
+                className="cursor-pointer focus:bg-primary/10 focus:text-primary"
+              >
                 <Phone className="w-4 h-4 mr-2" />
                 <span>Audio Call</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => joinCall(true)} className="cursor-pointer focus:bg-primary/10 focus:text-primary">
+              <DropdownMenuItem
+                onClick={() => joinCall(true)}
+                className="cursor-pointer focus:bg-primary/10 focus:text-primary"
+              >
                 <Video className="w-4 h-4 mr-2" />
                 <span>Video Call</span>
               </DropdownMenuItem>
